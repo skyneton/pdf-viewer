@@ -7,6 +7,8 @@ const PageViewer = () => {
     const DELAY = 705;
     let showTimeout;
     let loadingPage;
+    let beforeScrolledTime = Date.now();
+    let beforeViewportPageLeft = visualViewport.pageLeft;
 
     const cleanPageViewers = () => {
         const pageViewers = [...document.getElementsByClassName("pageViewer")];
@@ -206,10 +208,12 @@ const PageViewer = () => {
 
     window.onmouseup = e => {
         const between = e.clientX - clickedX;
-        if(Math.abs(between) < window.innerWidth * 0.1) {
+        if(Math.abs(between) < window.innerWidth * 0.09) {
             if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
             return;
         }
+        if(Date.now() - beforeScrolledTime < 50) return;
+
         const dir = between < 0 ? 1 : -1;
         onDirectionChanged(dir);
     };
@@ -220,13 +224,22 @@ const PageViewer = () => {
 
     window.ontouchend = e => {
         const between = e.changedTouches[0].clientX - clickedX;
-        if(Math.abs(between) < window.innerWidth * 0.1) {
+        if(Math.abs(between) < window.innerWidth * 0.09 && Math.abs(between) < 70) {
             if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
             return;
         }
+        if(Date.now() - beforeScrolledTime < 50) return;
+
         const dir = between < 0 ? 1 : -1;
         onDirectionChanged(dir);
     };
+
+    visualViewport.onscroll = e => {
+        if(Math.abs(visualViewport.pageLeft - beforeViewportPageLeft))
+            beforeScrolledTime = Date.now();
+
+        beforeViewportPageLeft = visualViewport.pageLeft;
+    }
     
     const fileReaderAsync = file => {
         return new Promise(resolve => {
