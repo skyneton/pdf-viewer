@@ -4,7 +4,7 @@ const PageViewer = () => {
     let timeout;
     let doc;
     let nowPage = 1;
-    const DELAY = 650;
+    const DELAY = 705;
     let showTimeout;
 
     const cleanPageViewers = () => {
@@ -33,7 +33,11 @@ const PageViewer = () => {
         imageBox.setAttribute("class", "pageViewer");
         const image = document.createElement("img");
 
-        imageBox.appendChild(image);
+        const imageCanvas = document.createElement("div");
+        imageCanvas.setAttribute("class", "imageCanvas");
+
+        imageCanvas.appendChild(image);
+        imageBox.appendChild(imageCanvas);
 
         const pdfPageData = await getPDFPageBlobUrl(i);
         image.src = pdfPageData.url;
@@ -43,17 +47,19 @@ const PageViewer = () => {
         return imageBox;
     };
 
-    const setHideViewer = (viewer, value) => {
-        const image = viewer.getElementsByTagName("img")[0]
+    const setHideViewer = (viewer, value, width, height) => {
+        const imageCanvas = viewer.getElementsByClassName("imageCanvas")[0]
         if(value) {
-            image.style.width = `${image.offsetWidth}px`;
-            image.style.height = `${image.offsetHeight}px`;
+            if(width == null) width = `${imageCanvas.offsetWidth}px`;
+            if(height == null) height = `${imageCanvas.offsetHeight}px`;
+            imageCanvas.style.width = width;
+            imageCanvas.style.height = height;
             viewer.setAttribute("hide", true);
         }else {
             viewer.removeAttribute("hide");
-            if(image) {
-                image.style.width = null;
-                image.style.height = null;
+            if(imageCanvas) {
+                imageCanvas.style.width = null;
+                imageCanvas.style.height = null;
             }
         }
     }
@@ -77,23 +83,46 @@ const PageViewer = () => {
             }
         }
         if(direction + nowDirection === 0 && pageViewers.length >= 2) {
+            let target, destroy, imageCanvas, destroyImageCanvas;
             if(direction == -1) {
-                setHideViewer(pageViewers[0], true);
-                setHideViewer(pageViewers[1], false);
-                timeout = setTimeout(() => {
-                    const imageSrc = pageViewers[0].getElementsByTagName("img")[0].src;
-                    imageSrc != null && URL.revokeObjectURL(imageSrc);
-                    pageViewers[0].remove();
-                }, DELAY);
+                destroy = pageViewers[0];
+                target = pageViewers[1];
+
+                imageCanvas = target.getElementsByClassName("imageCanvas")[0];
+                imageCanvas.style.left = "0";
+                imageCanvas.style.right = null;
+
+                destroyImageCanvas = destroy.getElementsByClassName("imageCanvas")[0];
+                destroyImageCanvas.style.left = null;
+                destroyImageCanvas.style.right = "0";
             }else {
-                setHideViewer(pageViewers[0], false);
-                setHideViewer(pageViewers[1], true);
-                timeout = setTimeout(() => {
-                    const imageSrc = pageViewers[1].getElementsByTagName("img")[0].src;
-                    imageSrc != null && URL.revokeObjectURL(imageSrc);
-                    pageViewers[1].remove();
-                }, DELAY);
+                destroy = pageViewers[1];
+                target = pageViewers[0];
+                imageCanvas = target.getElementsByClassName("imageCanvas")[0];
+                imageCanvas.style.left = null;
+                imageCanvas.style.right = "0";
+
+                destroyImageCanvas = destroy.getElementsByClassName("imageCanvas")[0];
+                destroyImageCanvas.style.left = "0";
+                destroyImageCanvas.style.right = null;
             }
+            destroy.setAttribute("hide", true);
+            setHideViewer(target, false);
+    
+            const subwidth = window.innerWidth >= 790 ? 150 : 0;
+            imageCanvas.style.width = `${window.innerWidth - subwidth - 10}px`;
+            imageCanvas.style.height = `${window.innerHeight}px`;
+            
+            timeout = setTimeout(() => {
+                const imageSrc = destroy.getElementsByTagName("img")[0].src;
+                imageSrc != null && URL.revokeObjectURL(imageSrc);
+                destroy.remove();
+                direction = 0;
+            }, DELAY);
+
+            nowPage -= direction;
+            direction = nowDirection;
+            return;
         }
 
         
@@ -101,84 +130,40 @@ const PageViewer = () => {
         document.getElementsByClassName("currentPage")[0].value = nowPage += nowDirection;
         sizeFitValue();
 
-        const imageBox = await getPDFPageImage(nowPage);
-        imageBox.style.width = "0px";
-        
-        const image = imageBox.getElementsByTagName("img")[0];
+        const pageViewer = await getPDFPageImage(nowPage);
+        const subwidth = window.innerWidth >= 790 ? 150 : 0;
+        const imageCanvas = pageViewer.getElementsByClassName("imageCanvas")[0];
 
-        const pageViewerWidth = pageViewers[0].offsetWidth;
-        const pageViewerHeight = pageViewers[0].offsetHeight;
-        const widthScale = pageViewerWidth / image.viewportWidth;
-        const heightScale = pageViewerHeight / image.viewportHeight;
-
-        const widthScaleX = image.viewportWidth * widthScale;
-        const widthScaleY = image.viewportHeight * widthScale;
-        const heightScaleX = image.viewportWidth * heightScale;
-        const heightScaleY = image.viewportHeight * heightScale;
-
-        image.style.maxWidth = "none";
-        image.style.maxHeight = "none";
-
-
-        if(widthScaleX > pageViewerWidth || widthScaleY > pageViewerHeight) {
-            image.style.width = `${heightScaleX}px`;
-            image.style.height = `${heightScaleY}px`;
-        }
-        else if(heightScaleX > pageViewerWidth || heightScaleY > pageViewerHeight) {
-            image.style.width = `${widthScaleX}px`;
-            image.style.height = `${widthScaleY}px`;
-        }
-        else {
-            if(widthScaleX > heightScaleX) {
-                image.style.width = `${widthScaleX}px`;
-                image.style.height = `${widthScaleY}px`;
-            }else {
-                image.style.width = `${heightScaleX}px`;
-                image.style.height = `${heightScaleY}px`;
-            }
-        }
-
-        setHideViewer(pageViewers[0], true);
+        setHideViewer(pageViewer, true, `${window.innerWidth - subwidth - 10}px`, `${window.innerHeight}px`);
 
         const loc = document.getElementsByClassName("pageContainer")[0];
 
+        const destroy = pageViewers[0];
         if(nowDirection == -1) {
-            loc.insertBefore(imageBox, pageViewers[0]);
-            imageBox.style.width = null;
-
-            setTimeout(() => {
-                if(image) {
-                    image.style.width = null;
-                    image.style.height = null;
-                    image.style.maxWidth = null;
-                    image.style.maxHeight = null;
-                }
-            }, DELAY);
-
-            timeout = setTimeout(() => {
-                const imageSrc = pageViewers[1].getElementsByTagName("img")[0].src;
-                imageSrc != null && URL.revokeObjectURL(imageSrc);
-                pageViewers[1].remove();
-            }, DELAY);
+            imageCanvas.style.right = "0";
+            pageViewers[0].getElementsByClassName("imageCanvas")[0].style.left = "0";
+            loc.insertBefore(pageViewer, pageViewers[0]);
         }else {
-            loc.appendChild(imageBox);
-            imageBox.style.width = null;
-
-            setTimeout(() => {
-                if(image) {
-                    image.style.width = null;
-                    image.style.height = null;
-                    image.style.maxWidth = null;
-                    image.style.maxHeight = null;
-                }
-            }, DELAY);
-
-            timeout = setTimeout(() => {
-                const imageSrc = pageViewers[0].getElementsByTagName("img")[0].src;
-                imageSrc != null && URL.revokeObjectURL(imageSrc);
-                pageViewers[0].remove();
-            }, DELAY);
+            imageCanvas.style.left = "0";
+            pageViewers[0].getElementsByClassName("imageCanvas")[0].style.right = "0";
+            loc.appendChild(pageViewer);
         }
+        setHideViewer(destroy, true);
+        pageViewer.removeAttribute("hide");
+
+        timeout = setTimeout(() => {
+            const imageSrc = destroy.getElementsByTagName("img")[0].src;
+            imageSrc != null && URL.revokeObjectURL(imageSrc);
+            destroy.remove();
+            direction = 0;
+
+            if(imageCanvas) {
+                imageCanvas.style.width = null;
+                imageCanvas.style.height = null;
+                imageCanvas.style.left = null;
+                imageCanvas.style.right = null;
+            }
+        }, DELAY);
 
         direction = nowDirection;
     };
