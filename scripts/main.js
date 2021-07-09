@@ -208,7 +208,7 @@ const PageViewer = () => {
 
     window.onmouseup = e => {
         const between = e.clientX - clickedX;
-        if(Math.abs(between) < window.innerWidth * 0.09) {
+        if(Math.abs(between) < visualViewport.width * 0.12) {
             if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
             return;
         }
@@ -224,7 +224,7 @@ const PageViewer = () => {
 
     window.ontouchend = e => {
         const between = e.changedTouches[0].clientX - clickedX;
-        if(Math.abs(between) < window.innerWidth * 0.09 && Math.abs(between) < 70) {
+        if(Math.abs(between) < visualViewport.width * 0.12) {
             if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
             return;
         }
@@ -234,10 +234,15 @@ const PageViewer = () => {
         onDirectionChanged(dir);
     };
 
-    visualViewport.onscroll = e => {
+    visualViewport.onscroll = () => {
         if(Math.abs(visualViewport.pageLeft - beforeViewportPageLeft))
             beforeScrolledTime = Date.now();
 
+        beforeViewportPageLeft = visualViewport.pageLeft;
+    }
+
+    visualViewport.onresize = () => {
+        beforeScrolledTime = Date.now();
         beforeViewportPageLeft = visualViewport.pageLeft;
     }
     
