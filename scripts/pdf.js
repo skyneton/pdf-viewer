@@ -1,4 +1,3 @@
-
 /**
  * @licstart The following is the entire license notice for the
  * Javascript code in this page
@@ -3885,7 +3884,7 @@ class BaseFontLoader {
   addNativeFontFace(nativeFontFace) {
     this.nativeFontFaces.push(nativeFontFace);
 
-    if(!!self) self.fonts.add(nativeFontFace);
+    if(self && self.fonts) self.fonts.add(nativeFontFace);
     this._document.fonts.add(nativeFontFace);
   }
 
@@ -3967,7 +3966,7 @@ class BaseFontLoader {
 
   get isFontLoadingAPISupported() {
     //return (0, _util.shadow)(this, "isFontLoadingAPISupported", !!this._document?.fonts || !!self.fonts);
-    return (0, _util.shadow)(this, "isFontLoadingAPISupported", this._document && this._document.fonts || !!self.fonts);
+    return (0, _util.shadow)(this, "isFontLoadingAPISupported", this._document && this._document.fonts || self && self.fonts);
   }
 
   get isSyncFontLoadingSupported() {

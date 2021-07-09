@@ -13,7 +13,7 @@ const PageViewer = () => {
     const cleanPageViewers = () => {
         const pageViewers = [...document.getElementsByClassName("pageViewer")];
         for(let i = 0; i < pageViewers.length; i++) {
-            if(pageViewers[i].offsetWidth === 0 || pageViewers[i].getElementsByTagName("img").length <= 0 || !pageViewers[i].hasAttribute("hide") && pageViewers[i].getAttribute("pageInfo") != nowPage)
+            if(pageViewers[i].offsetWidth === 0 || pageViewers[i].getElementsByTagName("img").length <= 0 || !pageViewers[i].hasAttribute("hide") && pageViewers[i].hasAttribute("pageInfo") && pageViewers[i].getAttribute("pageInfo") != nowPage)
                 pageViewers[i].remove();
         }
     };
@@ -366,10 +366,15 @@ const PageViewer = () => {
             let target = pageViewers[0];
             if(direction == 1 && pageViewers.length >= 2) target = pageViewers[1];
 
-            target.setAttribute("pageInfo", page);
+            if(target == null) {
+                target = await getPDFPageImage(page);
+                document.getElementsByClassName("pageContainer")[0].appendChild(target);
+            }else {
+                target.setAttribute("pageInfo", page);
 
-            const image = target.getElementsByTagName("img")[0];
-            image.src = (await getPDFPageBlobUrl(page)).url;
+                const image = target.getElementsByTagName("img")[0];
+                image.src = (await getPDFPageBlobUrl(page)).url;
+            }
 
             document.getElementsByClassName("currentPage")[0].value = nowPage = page;
             sizeFitValue();
