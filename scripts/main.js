@@ -13,7 +13,8 @@ const PageViewer = () => {
     const cleanPageViewers = () => {
         const pageViewers = [...document.getElementsByClassName("pageViewer")];
         for(let i = 0; i < pageViewers.length; i++) {
-            if(pageViewers[i].offsetWidth === 0 || pageViewers[i].getElementsByTagName("img").length <= 0) pageViewers[i].remove();
+            if(pageViewers[i].offsetWidth === 0 || pageViewers[i].getElementsByTagName("img").length <= 0 || !pageViewers[i].hasAttribute("hide") && pageViewers[i].getAttribute("pageInfo") != nowPage)
+                pageViewers[i].remove();
         }
     };
 
@@ -35,6 +36,8 @@ const PageViewer = () => {
         return new Promise(async resolve => {
             const imageBox = document.createElement("div");
             imageBox.setAttribute("class", "pageViewer");
+            imageBox.setAttribute("pageInfo", i);
+
             const image = document.createElement("img");
     
             const imageCanvas = document.createElement("div");
@@ -208,7 +211,7 @@ const PageViewer = () => {
 
     window.onmouseup = e => {
         const between = e.clientX - clickedX;
-        if(Math.abs(between) < visualViewport.width * 0.12) {
+        if(Math.abs(between) < visualViewport.width * 0.23) {
             if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
             return;
         }
@@ -224,7 +227,7 @@ const PageViewer = () => {
 
     window.ontouchend = e => {
         const between = e.changedTouches[0].clientX - clickedX;
-        if(Math.abs(between) < visualViewport.width * 0.12) {
+        if(Math.abs(between) < visualViewport.width * 0.23) {
             if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
             return;
         }
@@ -362,6 +365,8 @@ const PageViewer = () => {
 
             let target = pageViewers[0];
             if(direction == 1 && pageViewers.length >= 2) target = pageViewers[1];
+
+            target.setAttribute("pageInfo", page);
 
             const image = target.getElementsByTagName("img")[0];
             image.src = (await getPDFPageBlobUrl(page)).url;
