@@ -6,6 +6,7 @@ const PageViewer = () => {
     let nowPage = 1;
     const DELAY = 705;
     let showTimeout;
+    let loadingPage;
 
     const cleanPageViewers = () => {
         const pageViewers = [...document.getElementsByClassName("pageViewer")];
@@ -28,23 +29,27 @@ const PageViewer = () => {
         }
     };
 
-    const getPDFPageImage = async i => {
-        const imageBox = document.createElement("div");
-        imageBox.setAttribute("class", "pageViewer");
-        const image = document.createElement("img");
-
-        const imageCanvas = document.createElement("div");
-        imageCanvas.setAttribute("class", "imageCanvas");
-
-        imageCanvas.appendChild(image);
-        imageBox.appendChild(imageCanvas);
-
-        const pdfPageData = await getPDFPageBlobUrl(i);
-        image.src = pdfPageData.url;
-        image.viewportWidth = pdfPageData.width;
-        image.viewportHeight = pdfPageData.height;
-
-        return imageBox;
+    const getPDFPageImage = i => {
+        return new Promise(async resolve => {
+            const imageBox = document.createElement("div");
+            imageBox.setAttribute("class", "pageViewer");
+            const image = document.createElement("img");
+    
+            const imageCanvas = document.createElement("div");
+            imageCanvas.setAttribute("class", "imageCanvas");
+    
+            imageCanvas.appendChild(image);
+            imageBox.appendChild(imageCanvas);
+    
+            const pdfPageData = await getPDFPageBlobUrl(i);
+            image.src = pdfPageData.url;
+            image.viewportWidth = pdfPageData.width;
+            image.viewportHeight = pdfPageData.height;
+    
+            image.onload = () => {
+                resolve(imageBox);
+            };
+        });
     };
 
     const setHideViewer = (viewer, value, width, height) => {
@@ -65,23 +70,12 @@ const PageViewer = () => {
     }
 
     const onDirectionChanged = async nowDirection => {
-        if(doc == null || nowPage + nowDirection < 1 || nowPage + nowDirection > doc.numPages) return;
+        if(doc == null || nowDirection != 1 && nowDirection != -1 || nowPage + nowDirection < 1 || nowPage + nowDirection > doc.numPages || nowPage + nowDirection == loadingPage) return;
         const pageViewers = document.getElementsByClassName("pageViewer");
+        loadingPage = nowPage + nowDirection;
         cleanPageViewers();
         if(timeout != null) clearTimeout(timeout);
 
-        if(direction == nowDirection && pageViewers.length >= 2) {
-            if(direction == -1) {
-                const imageSrc = pageViewers[1].getElementsByTagName("img")[0].src;
-                imageSrc != null && URL.revokeObjectURL(imageSrc);
-                pageViewers[1].remove();
-            }
-            else {
-                const imageSrc = pageViewers[0].getElementsByTagName("img")[0].src;
-                imageSrc != null && URL.revokeObjectURL(imageSrc);
-                pageViewers[0].remove();
-            }
-        }
         if(direction + nowDirection === 0 && pageViewers.length >= 2) {
             let target, destroy, imageCanvas, destroyImageCanvas;
             if(direction == -1) {
@@ -125,12 +119,23 @@ const PageViewer = () => {
             return;
         }
 
+        const pageViewer = await getPDFPageImage(nowPage + nowDirection);
         
 
-        document.getElementsByClassName("currentPage")[0].value = nowPage += nowDirection;
-        sizeFitValue();
+        if(direction == nowDirection && pageViewers.length >= 2) {
+            if(direction == -1) {
+                const imageSrc = pageViewers[1].getElementsByTagName("img")[0].src;
+                imageSrc != null && URL.revokeObjectURL(imageSrc);
+                pageViewers[1].remove();
+            }
+            else {
+                const imageSrc = pageViewers[0].getElementsByTagName("img")[0].src;
+                imageSrc != null && URL.revokeObjectURL(imageSrc);
+                pageViewers[0].remove();
+            }
+        }
 
-        const pageViewer = await getPDFPageImage(nowPage);
+        
         const subwidth = window.innerWidth >= 790 ? 150 : 0;
         const imageCanvas = pageViewer.getElementsByClassName("imageCanvas")[0];
 
@@ -139,22 +144,30 @@ const PageViewer = () => {
         const loc = document.getElementsByClassName("pageContainer")[0];
 
         const destroy = pageViewers[0];
-        if(nowDirection == -1) {
-            imageCanvas.style.right = "0";
-            pageViewers[0].getElementsByClassName("imageCanvas")[0].style.left = "0";
-            loc.insertBefore(pageViewer, pageViewers[0]);
-        }else {
-            imageCanvas.style.left = "0";
-            pageViewers[0].getElementsByClassName("imageCanvas")[0].style.right = "0";
+        if(destroy == null) {
+            pageViewer.removeAttribute("hide");
             loc.appendChild(pageViewer);
         }
-        setHideViewer(destroy, true);
-        pageViewer.removeAttribute("hide");
+        else {
+            if(nowDirection == -1) {
+                imageCanvas.style.right = "0";
+                destroy.getElementsByClassName("imageCanvas")[0].style.left = "0";
+                loc.insertBefore(pageViewer, destroy);
+            }else {
+                imageCanvas.style.left = "0";
+                destroy.getElementsByClassName("imageCanvas")[0].style.right = "0";
+                loc.appendChild(pageViewer);
+            }
+            setHideViewer(destroy, true);
+            pageViewer.removeAttribute("hide");
+        }
 
         timeout = setTimeout(() => {
-            const imageSrc = destroy.getElementsByTagName("img")[0].src;
-            imageSrc != null && URL.revokeObjectURL(imageSrc);
-            destroy.remove();
+            if(destroy) {
+                const imageSrc = destroy.getElementsByTagName("img")[0].src;
+                imageSrc != null && URL.revokeObjectURL(imageSrc);
+                destroy.remove();
+            }
             direction = 0;
 
             if(imageCanvas) {
@@ -166,7 +179,26 @@ const PageViewer = () => {
         }, DELAY);
 
         direction = nowDirection;
+        document.getElementsByClassName("currentPage")[0].value = nowPage += nowDirection;
+        sizeFitValue();
     };
+
+    window.onkeydown = e => {
+        if(doc == null || document.getElementsByClassName("currentPage")[0].isFocus) return;
+        if(e.keyCode == 37) {
+            onDirectionChanged(-1);
+            viewer.showMenu();
+        }else if(e.keyCode == 39) {
+            onDirectionChanged(1);
+            viewer.showMenu();
+        }else if(e.keyCode == 36) {
+            viewer.setPage(1);
+            viewer.showMenu();
+        }else if(e.keyCode == 35) {
+            viewer.setPage(doc.numPages);
+            viewer.showMenu();
+        }
+    }
 
     window.onmousedown = e => {
         clickedX = e.clientX;
