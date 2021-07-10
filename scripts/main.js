@@ -93,9 +93,12 @@ const PageViewer = () => {
         cleanPageViewers();
         if(timeout != null) clearTimeout(timeout);
 
+        const scrollTarget = document.getElementsByClassName("containerViewer")[0];
+
         if(direction + nowDirection === 0 && pageViewers.length >= 2) {
             let target, destroy, imageCanvas, destroyImageCanvas;
             if(direction == -1) {
+                scrollTarget.scrollLeft = 0;
                 destroy = pageViewers[0];
                 target = pageViewers[1];
 
@@ -107,6 +110,7 @@ const PageViewer = () => {
                 destroyImageCanvas.style.left = null;
                 destroyImageCanvas.style.right = "0";
             }else {
+                scrollTarget.scrollLeft = scrollTarget.scrollWidth;
                 destroy = pageViewers[1];
                 target = pageViewers[0];
                 imageCanvas = target.getElementsByClassName("imageCanvas")[0];
@@ -163,11 +167,13 @@ const PageViewer = () => {
         }
         else {
             if(nowDirection == -1) {
+                scrollTarget.scrollLeft = scrollTarget.scrollWidth;
                 imageCanvas.style.right = "0";
                 destroy.getElementsByClassName("imageCanvas")[0].style.left = "0";
                 destroy.getElementsByClassName("imageCanvas")[0].style.right = null;
                 loc.insertBefore(pageViewer, destroy);
             }else {
+                scrollTarget.scrollLeft = 0;
                 imageCanvas.style.left = "0";
                 destroy.getElementsByClassName("imageCanvas")[0].style.left = null;
                 destroy.getElementsByClassName("imageCanvas")[0].style.right = "0";
@@ -256,9 +262,28 @@ const PageViewer = () => {
     window.ontouchmove = e => {
         if(e.touches.length != 2) return;
         const nowDistance = Math.sqrt((e.touches[0].screenX - e.touches[1].screenX) ** 2 - (e.touches[0].screenY - e.touches[1].screenY) ** 2);
-        nowZoomScale += (nowDistance - beforeDistance) / 2;
+        const changeZoomPercent = (nowDistance - beforeDistance) / 2;
+        nowZoomScale += changeZoomPercent;
+        let changedAmount = nowZoomScale;
         nowZoomScale = clamp(nowZoomScale, 1, maxZoomScale);
-            
+        changedAmount = nowZoomScale - changedAmount;
+
+        document.getElementsByClassName("pageContainer")[0].style.width = `${nowZoomScale * 100}%`;
+        document.getElementsByClassName("pageContainer")[0].style.height = `${nowZoomScale * 100}%`;
+
+        const screenX = (e.touches[0].screenX + e.touches[1].screenX) / 2;
+        const screenY = (e.touches[0].screenX + e.touches[1].screenX) / 2;
+
+        const target = document.getElementsByClassName("containerViewer")[0];
+
+        if(changedAmount < 0) {
+            target.scrollLeft -= screenX;
+            target.scrollTop -= screenY;
+        }else if(changedAmount > 0) {
+            target.scrollLeft += screenX;
+            target.scrollTop += screenY;
+        }
+
         beforeDistance = nowDistance;
     }
 
@@ -388,6 +413,13 @@ const PageViewer = () => {
         viewer.setPage(parseInt(document.getElementsByClassName("currentPage")[0].value));
     }
 
+    document.getElementsByClassName("containerViewer")[0].onscroll = () => {
+        const nowScrollLeft = document.getElementsByClassName("containerViewer")[0].scrollLeft;
+        if(Math.abs(nowScrollLeft - beforeViewportPageLeft)) beforeScrolledTime = Date.now();
+        
+        beforeViewportPageLeft = document.getElementsByClassName("containerViewer")[0].scrollLeft;
+    }
+
     const sizeFitValue = () => {
         const text = document.getElementsByClassName("currentPageWidth")[0];
         const input = document.getElementsByClassName("currentPage")[0];
@@ -424,6 +456,9 @@ const PageViewer = () => {
 
             nowPage = page;
             setPageInfo();
+
+            document.getElementsByClassName("pageContainer")[0].style.width = null;
+            document.getElementsByClassName("pageContainer")[0].style.height = null;
         }
 
         showMenu() {
