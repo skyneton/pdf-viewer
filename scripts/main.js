@@ -211,11 +211,11 @@ const PageViewer = () => {
 
     window.onmouseup = e => {
         const between = e.clientX - clickedX;
-        if(Math.abs(between) < visualViewport.width * 0.23) {
+        if(Math.abs(between) < visualViewport.width * 0.15) {
             if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
             return;
         }
-        if(Date.now() - beforeScrolledTime < 50) return;
+        if(Date.now() - beforeScrolledTime < 20) return;
 
         const dir = between < 0 ? 1 : -1;
         onDirectionChanged(dir);
@@ -227,11 +227,11 @@ const PageViewer = () => {
 
     window.ontouchend = e => {
         const between = e.changedTouches[0].clientX - clickedX;
-        if(Math.abs(between) < visualViewport.width * 0.23) {
+        if(Math.abs(between) < visualViewport.width * 0.15) {
             if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
             return;
         }
-        if(Date.now() - beforeScrolledTime < 50) return;
+        if(Date.now() - beforeScrolledTime < 20) return;
 
         const dir = between < 0 ? 1 : -1;
         onDirectionChanged(dir);
