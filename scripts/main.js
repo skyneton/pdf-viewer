@@ -1,6 +1,6 @@
 const PageViewer = () => {
     let direction = 0;
-    let clickedX = 0;
+    const clicked = {x: 0, y: 0, startClickTime: Date.now()};
     let timeout;
     let doc;
     let nowPage = 1;
@@ -52,6 +52,7 @@ const PageViewer = () => {
             image.viewportHeight = pdfPageData.height;
     
             image.onload = () => {
+                URL.revokeObjectURL(image.src);
                 resolve(imageBox);
             };
         });
@@ -113,8 +114,6 @@ const PageViewer = () => {
             imageCanvas.style.height = `${window.innerHeight}px`;
             
             timeout = setTimeout(() => {
-                const imageSrc = destroy.getElementsByTagName("img")[0].src;
-                imageSrc != null && URL.revokeObjectURL(imageSrc);
                 destroy.remove();
                 direction = 0;
             }, DELAY);
@@ -129,13 +128,9 @@ const PageViewer = () => {
 
         if(direction == nowDirection && pageViewers.length >= 2) {
             if(direction == -1) {
-                const imageSrc = pageViewers[1].getElementsByTagName("img")[0].src;
-                imageSrc != null && URL.revokeObjectURL(imageSrc);
                 pageViewers[1].remove();
             }
             else {
-                const imageSrc = pageViewers[0].getElementsByTagName("img")[0].src;
-                imageSrc != null && URL.revokeObjectURL(imageSrc);
                 pageViewers[0].remove();
             }
         }
@@ -157,9 +152,11 @@ const PageViewer = () => {
             if(nowDirection == -1) {
                 imageCanvas.style.right = "0";
                 destroy.getElementsByClassName("imageCanvas")[0].style.left = "0";
+                destroy.getElementsByClassName("imageCanvas")[0].style.right = null;
                 loc.insertBefore(pageViewer, destroy);
             }else {
                 imageCanvas.style.left = "0";
+                destroy.getElementsByClassName("imageCanvas")[0].style.left = null;
                 destroy.getElementsByClassName("imageCanvas")[0].style.right = "0";
                 loc.appendChild(pageViewer);
             }
@@ -169,8 +166,6 @@ const PageViewer = () => {
 
         timeout = setTimeout(() => {
             if(destroy) {
-                const imageSrc = destroy.getElementsByTagName("img")[0].src;
-                imageSrc != null && URL.revokeObjectURL(imageSrc);
                 destroy.remove();
             }
             direction = 0;
@@ -186,6 +181,12 @@ const PageViewer = () => {
         direction = nowDirection;
         document.getElementsByClassName("currentPage")[0].value = nowPage += nowDirection;
         sizeFitValue();
+
+        if(document.fullscreenElement == null) {
+            const canvas = document.getElementsByClassName("canvas")[0];
+            canvas.requestFullscreen() || canvas.webkitRequestFullscreen() || canvas.mozRequestFullScreen() || canvas.msRequestFullscreen();
+            document.exitFullscreen() || document.webkitExitFullscreen() || document.mozCancelFullScreen() || document.msExitFullscreen();
+        }
     };
 
     window.onkeydown = e => {
@@ -206,13 +207,15 @@ const PageViewer = () => {
     }
 
     window.onmousedown = e => {
-        clickedX = e.clientX;
+        clicked.x = e.screenX;
+        clicked.y = e.screenY;
+        clicked.startClickTime = Date.now();
     };
 
     window.onmouseup = e => {
-        const between = e.clientX - clickedX;
-        if(Math.abs(between) < visualViewport.width * 0.15) {
-            if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
+        const between = e.screenX - clicked.x;
+        if(Math.abs(between) < window.innerWidth * 0.085) {
+            if(!document.getElementsByClassName("currentPage")[0].isFocus && Math.abs(e.screenY - clicked.y) < window.innerHeight * 0.09) viewer.showMenu();
             return;
         }
         if(Date.now() - beforeScrolledTime < 20) return;
@@ -222,13 +225,15 @@ const PageViewer = () => {
     };
 
     window.ontouchstart = e => {
-        clickedX = e.touches[0].clientX;
+        clicked.x = e.touches[0].screenX;
+        clicked.y = e.touches[0].screenY;
+        clicked.startClickTime = Date.now();
     };
 
     window.ontouchend = e => {
-        const between = e.changedTouches[0].clientX - clickedX;
-        if(Math.abs(between) < visualViewport.width * 0.15) {
-            if(!document.getElementsByClassName("currentPage")[0].isFocus) viewer.showMenu();
+        const between = e.changedTouches[0].screenX - clicked.x;
+        if(Math.abs(between) < window.innerWidth * 0.085) {
+            if(!document.getElementsByClassName("currentPage")[0].isFocus && Math.abs(e.changedTouches[0].screenY - clicked.y) < window.innerHeight * 0.09) viewer.showMenu();
             return;
         }
         if(Date.now() - beforeScrolledTime < 20) return;
@@ -236,6 +241,10 @@ const PageViewer = () => {
         const dir = between < 0 ? 1 : -1;
         onDirectionChanged(dir);
     };
+
+    window.oncontextmenu = e => {
+        e.preventDefault();
+    }
 
     visualViewport.onscroll = () => {
         if(Math.abs(visualViewport.pageLeft - beforeViewportPageLeft))
@@ -374,10 +383,20 @@ const PageViewer = () => {
 
                 const image = target.getElementsByTagName("img")[0];
                 image.src = (await getPDFPageBlobUrl(page)).url;
+
+                image.onload = () => {
+                    URL.revokeObjectURL(image.src);
+                }
             }
 
             document.getElementsByClassName("currentPage")[0].value = nowPage = page;
             sizeFitValue();
+            
+            if(document.fullscreenElement == null) {
+                const canvas = document.getElementsByClassName("canvas")[0];
+                canvas.requestFullscreen() || canvas.webkitRequestFullscreen() || canvas.mozRequestFullScreen() || canvas.msRequestFullscreen();
+                document.exitFullscreen() || document.webkitExitFullscreen() || document.mozCancelFullScreen() || document.msExitFullscreen();
+            }
         }
 
         showMenu() {
