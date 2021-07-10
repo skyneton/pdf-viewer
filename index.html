@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0">
     <title>PDF Viewer</title>
     <meta name="og:description" content="PDF 뷰어. 드래그 앤 드롭을 통해 PDF를 볼 수 있습니다.">
     <meta name="og:title" content="PDF Viewer">
@@ -25,10 +25,12 @@
                 <path d="M40 5 L 17 25 M 17 25 L 40 45"/>
             </svg>
         </div>
-        <div class="pageContainer">
-            <div class="pageViewer">
-                <div class="imageCanvas">
-                    <img>
+        <div class="containerViewer">
+            <div class="pageContainer">
+                <div class="pageViewer">
+                    <div class="imageCanvas">
+                        <img>
+                    </div>
                 </div>
             </div>
         </div>
@@ -38,10 +40,26 @@
             </svg>
         </div>
         <footer class="menu">
+            <div class="sideMenu"></div>
             <div class="pageInfo">
                 <input type="number" class="currentPage" inputmode="numeric" value="0" maxlength="1">
                 <span>/&nbsp;</span>
                 <span class="numPages">0</span>
+            </div>
+            <div class="fullModeMenu">
+				<svg class="fullModeState fullPageMode" width="24" height="24">
+					<path d="M19,3H14V5h5v5h2V5A2,2,0,0,0,19,3Z"></path>
+					<path d="M19,19H14v2h5a2,2,0,0,0,2-2V14H19Z"></path>
+					<path d="M3,5v5H5V5h5V3H5A2,2,0,0,0,3,5Z"></path>
+					<path d="M5,14H3v5a2,2,0,0,0,2,2h5V19H5Z"></path>
+				</svg>
+
+				<svg class="fullModeState defaultPageMode" width="24" height="24">
+					<path d="M16,8V3H14V8a2,2,0,0,0,2,2h5V8Z"></path>
+					<path d="M14,16v5h2V16h5V14H16A2,2,0,0,0,14,16Z"></path>
+					<path d="M8,8H3v2H8a2,2,0,0,0,2-2V3H8Z"></path>
+					<path d="M8,14H3v2H8v5h2V16A2,2,0,0,0,8,14Z"></path>
+				</svg>
             </div>
         </footer>
     </div>

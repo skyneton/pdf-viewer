@@ -23,12 +23,30 @@
     height: 100%;
     background-color: black;
 }
-.pageContainer {
-    display: flex;
+
+.containerViewer {
+    overflow: auto;
     position: fixed;
-    height: 100%;
     left: 0;
     right: 0;
+    height: 100%;
+}
+.containerViewer::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    /* background-color: rgba(255, 255, 255, 0.7); */
+    border-radius: 4px;
+    position: absolute;
+}
+.containerViewer::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background-color: rgba(150, 150, 150, 0.8);
+    position: absolute;
+  }
+
+.pageContainer {
+    display: flex;
+    height: 100%;
 }
 
 .pageViewer {
@@ -49,7 +67,7 @@
     justify-content: center;
 }
 
-.pageViewer img {
+.pageViewer canvas {
     max-width: 100%;
     max-height: 100%;
     margin: auto;
@@ -61,11 +79,6 @@
 .pageViewer[hide] {
     width: 0;
     margin: 0;
-}
-
-.pageViewer[hide] img {
-    max-width: none;
-    max-height: none;
 }
 
 .leftPageMoveBox, .rightPageMoveBox {
@@ -115,6 +128,36 @@
     transform: scaleY(1);
 }
 
+.sideMenu, .fullModeMenu {
+    width: 100%;
+    height: 100%;
+}
+
+.fullModeMenu {
+    display: flex;
+    align-items: center;
+    flex-direction: row-reverse;
+    padding: 0 10px;
+}
+
+.fullModeMenu .fullPageMode {
+    display: none;
+}
+
+.fullModeMenu[full] .fullPageMode {
+    display: inline-block;
+}
+
+.fullModeMenu[full] .defaultPageMode {
+    display: none;
+}
+
+.fullModeState {
+    fill: rgb(216, 216, 216);
+    cursor: pointer;
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
 .currentPageWidth {
     position: fixed;
     z-index: -100;
@@ -150,7 +193,7 @@
     .canvas {
         background-color: #00000000;
     }
-    .pageContainer {
+    .containerViewer {
         left: 75px;
         right: 75px;
     }
