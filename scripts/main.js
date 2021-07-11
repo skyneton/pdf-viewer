@@ -13,9 +13,9 @@ const PageViewer = () => {
 
     let beforeKeyPressTime = Date.now();
 
-    let beforeTouchMovePageTime = Date.now();
-
     let reader;
+
+    let pointerUpComplete = false;
 
     const offset = {
         x: 0,
@@ -254,12 +254,14 @@ const PageViewer = () => {
         clicked.x = e.clientX;
         clicked.y = e.clientY;
         clicked.startClickTime = Date.now();
+        pointerUpComplete = false;
     };
 
     window.onmouseup = e => {
-        const between = e.clientX - clicked.x;
+        if(pointerUpComplete || Date.now() - beforeScrolledTime < 20) return;
+        pointerUpComplete = true;
 
-        if(Date.now() - beforeScrolledTime < 20) return;
+        const between = e.clientX - clicked.x;
 
         const percentWidth = window.innerWidth * 0.2;
         if(window.innerWidth < 790 && Date.now() - clicked.startClickTime < 150 && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.clientY)) {
@@ -285,6 +287,8 @@ const PageViewer = () => {
         clicked.x = e.touches[0].screenX;
         clicked.y = e.touches[0].screenY;
         clicked.startClickTime = Date.now();
+        pointerUpComplete = false;
+
         if(e.touches.length > 1) {
             dragPageMove = false;
         }else {
@@ -296,7 +300,7 @@ const PageViewer = () => {
         }
     };
 
-    window.addEventListener("touchmove", e => {
+    window.ontouchmove = e => {
         if(e.touches.length != 2) return;
 
         const nowDistance = Math.abs(Math.sqrt((e.touches[0].screenX - e.touches[1].screenX) ** 2 + (e.touches[0].screenY - e.touches[1].screenY) ** 2));
@@ -346,7 +350,7 @@ const PageViewer = () => {
         touchMoveData.beforeDistance = nowDistance;
         touchMoveData.beforeX = screenX;
         touchMoveData.beforeY = screenY;
-    }, {passive: false});
+    };
 
     window.ontouchend = e => {
         if(e.touches.length == 2) {
@@ -357,13 +361,13 @@ const PageViewer = () => {
             if(e.touches.length == 0) dragPageMove = true;
             return;
         }
-        if(Date.now() - beforeTouchMovePageTime < 80) return;
-        beforeTouchMovePageTime = Date.now();
-        if(Date.now() - beforeScrolledTime < 20) return;
+        
+        if(pointerUpComplete || Date.now() - beforeScrolledTime < 20) return;
+        pointerUpComplete = true;
 
         const between = e.changedTouches[0].screenX - clicked.x;
         const percentWidth = window.innerWidth * 0.12;
-        if(Math.abs(e.changedTouches[0].screenY - clicked.y) < Math.min(100, percentWidth) && Math.abs(between) < Math.min(100, percentWidth) && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.changedTouches[0].clientX)) {
+        if(Math.abs(e.changedTouches[0].screenY - clicked.y) < Math.min(100, percentWidth) && Math.abs(between) < Math.min(100, percentWidth) && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.changedTouches[0].clientY)) {
             if(window.innerWidth < 790 && e.changedTouches[0].pageX >= window.innerWidth - percentWidth) {
                 onDirectionChanged(1);
                 return;
