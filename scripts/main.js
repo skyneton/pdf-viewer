@@ -11,6 +11,8 @@ const PageViewer = () => {
     let beforeViewportPageLeft = 0;
     let dragPageMove = true;
 
+    let beforeKeyPressTime = Date.now();
+
     let beforeTouchMovePageTime = Date.now();
 
     const touchMoveData = {
@@ -29,17 +31,19 @@ const PageViewer = () => {
         }
     };
 
-    const getPDFPageCanvas = async i => {
-        const page = await doc.getPage(i);
-        const viewport = page.getViewport({scale: 2 * (96.0 / 72.0)});
-
+    const getPDFPageCanvas = i => {
         const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
 
-        page.render({
-            canvasContext: canvas.getContext("2d", { alpha: false }),
-            viewport,
+        doc.getPage(i).then(page => {
+            const viewport = page.getViewport({scale: 2 * (96.0 / 72.0)});
+
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            page.render({
+                canvasContext: canvas.getContext("2d", { alpha: false }),
+                viewport,
+            });
         });
 
         return canvas;
@@ -50,7 +54,7 @@ const PageViewer = () => {
         sizeFitValue();
     }
 
-    const getPDFPageImage = async i => {
+    const getPDFPageImage = i => {
         const imageBox = document.createElement("div");
         imageBox.setAttribute("class", "pageViewer");
         imageBox.setAttribute("pageInfo", i);
@@ -58,7 +62,7 @@ const PageViewer = () => {
         const imageCanvas = document.createElement("div");
         imageCanvas.setAttribute("class", "imageCanvas");
 
-        imageCanvas.appendChild(await getPDFPageCanvas(i));
+        imageCanvas.appendChild(getPDFPageCanvas(i));
         imageBox.appendChild(imageCanvas);
         return imageBox;
     };
@@ -150,7 +154,7 @@ const PageViewer = () => {
             return;
         }
 
-        const pageViewer = await getPDFPageImage(nowPage + nowDirection);
+        const pageViewer = getPDFPageImage(nowPage + nowDirection);
         
 
         if(direction == nowDirection && pageViewers.length >= 2) {
@@ -212,12 +216,19 @@ const PageViewer = () => {
 
     window.onkeydown = e => {
         if(doc == null || document.getElementsByClassName("currentPage")[0].isFocus) return;
+        const now = Date.now();
         if(e.keyCode == 37) {
-            onDirectionChanged(-1);
-            viewer.showMenu();
+            if(now - beforeKeyPressTime > 50) {
+                onDirectionChanged(-1);
+                viewer.showMenu();
+                beforeKeyPressTime = now;
+            }
         }else if(e.keyCode == 39) {
-            onDirectionChanged(1);
-            viewer.showMenu();
+            if(now - beforeKeyPressTime > 50) {
+                onDirectionChanged(1);
+                viewer.showMenu();
+                beforeKeyPressTime = now;
+            }
         }else if(e.keyCode == 36) {
             viewer.setPage(1);
             viewer.showMenu();
@@ -237,10 +248,9 @@ const PageViewer = () => {
         const between = e.clientX - clicked.x;
 
         if(Date.now() - beforeScrolledTime < 20) return;
-        if(document.getElementsByClassName("menu")[0].hasAttribute("show") && window.innerHeight - 40 < e.clientY) return;
 
         const percentWidth = window.innerWidth * 0.2;
-        if(window.innerWidth < 790 && Date.now() - clicked.startClickTime < 150) {
+        if(window.innerWidth < 790 && Date.now() - clicked.startClickTime < 150 && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.clientY)) {
             if(e.clientX >= window.innerWidth - percentWidth) {
                 onDirectionChanged(1);
                 return;
@@ -329,14 +339,13 @@ const PageViewer = () => {
             if(e.touches.length == 0) dragPageMove = true;
             return;
         }
-        if(Date.now() - beforeTouchMovePageTime < 10) return;
+        if(Date.now() - beforeTouchMovePageTime < 80) return;
         beforeTouchMovePageTime = Date.now();
         if(Date.now() - beforeScrolledTime < 20) return;
-        if(document.getElementsByClassName("menu")[0].hasAttribute("show") && window.innerHeight - 40 < e.clientY) return;
 
         const between = e.changedTouches[0].screenX - clicked.x;
         const percentWidth = window.innerWidth * 0.12;
-        if(Math.abs(e.changedTouches[0].screenY - clicked.y) < Math.min(100, percentWidth) && Math.abs(between) < Math.min(100, percentWidth)) {
+        if(Math.abs(e.changedTouches[0].screenY - clicked.y) < Math.min(100, percentWidth) && Math.abs(between) < Math.min(100, percentWidth) && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.e.changedTouches[0].clientX)) {
             if(window.innerWidth < 790 && e.changedTouches[0].screenX >= window.innerWidth - percentWidth) {
                 onDirectionChanged(1);
                 return;
@@ -494,12 +503,12 @@ const PageViewer = () => {
             if(direction == 1 && pageViewers.length >= 2) target = pageViewers[1];
 
             if(target == null) {
-                target = await getPDFPageImage(page);
+                target = getPDFPageImage(page);
                 document.getElementsByClassName("pageContainer")[0].appendChild(target);
             }else {
                 target.setAttribute("pageInfo", page);
                 while(target.getElementsByTagName("canvas").length > 0) target.getElementsByTagName("canvas")[0].remove();
-                target.getElementsByClassName("imageCanvas")[0].appendChild(await getPDFPageCanvas(page));
+                target.getElementsByClassName("imageCanvas")[0].appendChild(getPDFPageCanvas(page));
             }
 
             nowPage = page;
