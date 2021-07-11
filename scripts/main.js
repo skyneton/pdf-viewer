@@ -17,6 +17,11 @@ const PageViewer = () => {
 
     let reader;
 
+    const offset = {
+        x: 0,
+        y: 0,
+    }
+
     const touchMoveData = {
         maxZoomScale: 5,
         nowZoomScale: 1,
@@ -37,7 +42,7 @@ const PageViewer = () => {
         const canvas = document.createElement("canvas");
 
         if(reader != null) {
-            reader.drawPageCanvas(canvas, 2 * (96.0 / 72.0), i);
+            reader.drawPageCanvas(canvas, i, 2 * (96.0 / 72.0));
             return canvas;
         }
 
@@ -104,7 +109,7 @@ const PageViewer = () => {
     }
 
     const onDirectionChanged = async nowDirection => {
-        if(doc == null || nowDirection != 1 && nowDirection != -1 || nowPage + nowDirection < 1 || nowPage + nowDirection > doc.numPages || nowPage + nowDirection == loadingPage) return;
+        if(reader == null && doc == null || nowDirection != 1 && nowDirection != -1 || nowPage + nowDirection < 1 || nowPage + nowDirection > viewer.numPages || nowPage + nowDirection == loadingPage) return;
         const pageViewers = document.getElementsByClassName("pageViewer");
         loadingPage = nowPage + nowDirection;
         cleanPageViewers();
@@ -222,7 +227,7 @@ const PageViewer = () => {
     };
 
     window.onkeydown = e => {
-        if(doc == null || document.getElementsByClassName("currentPage")[0].isFocus) return;
+        if(reader == null && doc == null || document.getElementsByClassName("currentPage")[0].isFocus) return;
         const now = Date.now();
         if(e.keyCode == 37) {
             if(now - beforeKeyPressTime > 50) {
@@ -240,7 +245,7 @@ const PageViewer = () => {
             viewer.setPage(1);
             viewer.showMenu();
         }else if(e.keyCode == 35) {
-            viewer.setPage(doc.numPages);
+            viewer.setPage(viewer.numPages);
             viewer.showMenu();
         }
     }
@@ -291,16 +296,16 @@ const PageViewer = () => {
         }
     };
 
-    window.ontouchmove = e => {
+    window.addEventListener("touchmove", e => {
         if(e.touches.length != 2) return;
 
         const nowDistance = Math.abs(Math.sqrt((e.touches[0].screenX - e.touches[1].screenX) ** 2 + (e.touches[0].screenY - e.touches[1].screenY) ** 2));
         const changeZoomPercent = (nowDistance - touchMoveData.beforeDistance) / 40;
         
-        const screenX = (e.touches[0].screenX + e.touches[1].screenX) / 2;
-        const screenY = (e.touches[0].screenX + e.touches[1].screenX) / 2;
+        const screenX = (e.touches[0].pageX + e.touches[1].pageX) / 2;
+        const screenY = (e.touches[0].pageY + e.touches[1].pageY) / 2;
 
-        if(touchMoveData.beforeDistance < 0 || isNaN(changeZoomPercent)) {
+        if(Math.abs(changeZoomPercent) <= 0.003 || touchMoveData.beforeDistance < 0 || isNaN(changeZoomPercent)) {
             touchMoveData.beforeDistance = nowDistance;
             touchMoveData.beforeX = screenX;
             touchMoveData.beforeY = screenY;
@@ -318,11 +323,17 @@ const PageViewer = () => {
         if(touchMoveData.beforeX == -1 || touchMoveData.beforeY == -1) {
             touchMoveData.beforeX = screenX;
             touchMoveData.beforeY = screenY;
-        }else {
+        }else if(changedAmount) {
             const target = document.getElementsByClassName("containerViewer")[0];
 
-            const changeX = Math.ceil((screenX - touchMoveData.beforeX) * touchMoveData.nowZoomScale);
-            const changeY = Math.ceil((screenY - touchMoveData.beforeY) * touchMoveData.nowZoomScale);
+            const changeX = changedAmount * (screenX + offset.x);
+            const changeY = changedAmount * (screenY + offset.y);
+
+            offset.x += changeX;
+            offset.y += changeY;
+            offset.x = clamp(offset.x, 0, target.scrollWidth - window.innerHeight / 1.8);
+            offset.y = clamp(offset.y, 0, target.scrollHeight - window.innerHeight / 1.8);
+
             if(changedAmount < 0) {
                 target.scrollLeft -= changeX;
                 target.scrollTop -= changeY;
@@ -335,7 +346,7 @@ const PageViewer = () => {
         touchMoveData.beforeDistance = nowDistance;
         touchMoveData.beforeX = screenX;
         touchMoveData.beforeY = screenY;
-    }
+    }, {passive: false});
 
     window.ontouchend = e => {
         if(e.touches.length == 2) {
@@ -352,8 +363,8 @@ const PageViewer = () => {
 
         const between = e.changedTouches[0].screenX - clicked.x;
         const percentWidth = window.innerWidth * 0.12;
-        if(Math.abs(e.changedTouches[0].screenY - clicked.y) < Math.min(100, percentWidth) && Math.abs(between) < Math.min(100, percentWidth) && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.e.changedTouches[0].clientX)) {
-            if(window.innerWidth < 790 && e.changedTouches[0].screenX >= window.innerWidth - percentWidth) {
+        if(Math.abs(e.changedTouches[0].screenY - clicked.y) < Math.min(100, percentWidth) && Math.abs(between) < Math.min(100, percentWidth) && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.changedTouches[0].clientX)) {
+            if(window.innerWidth < 790 && e.changedTouches[0].pageX >= window.innerWidth - percentWidth) {
                 onDirectionChanged(1);
                 return;
             }else if(window.innerWidth < 790 && e.changedTouches[0].screenX <= percentWidth) {
@@ -407,7 +418,7 @@ const PageViewer = () => {
         for(let i = 0; i < files.length; i++) {
             if(files[i].type === "application/pdf") {
                 try {
-                    reader = new PDFReader({
+                    window.a = reader = new PDFReader({
                         numWorkers: 2,
                         success(pages) {
                             document.getElementsByClassName("canvas")[0].style.display = null;
@@ -416,17 +427,17 @@ const PageViewer = () => {
 
                             document.getElementsByClassName("numPages")[0].innerText = pages;
                         },error(e) {
-                            console.log(e);
+                            console.error(e);
                             reader = undefined;
                         }
-                    });
+                    }, files[i]);
                 }catch {
                     doc = await pdfjsLib.getDocument(await fileReaderAsync(files[i])).promise;
                     document.getElementsByClassName("canvas")[0].style.display = null;
                     document.getElementsByClassName("fileInput")[0].style.display = "none";
                     viewer.setPage(1);
 
-                    document.getElementsByClassName("numPages")[0].innerText = doc.numPages;
+                    document.getElementsByClassName("numPages")[0].innerText = viewer.numPages;
                 }
                 break;
             }
@@ -511,10 +522,20 @@ const PageViewer = () => {
             return nowPage;
         }
 
+        get numPages() {
+            if(reader) return reader.numPages;
+            if(doc) return doc.numPages;
+            return 0;
+        }
+
+        get zoomScale() {
+            return touchMoveData.nowZoomScale;
+        }
+
         async setPage(page) {
             if(page == null) return;
             if(reader == null && doc == null) return;
-            const numPages = reader.numPages || doc.numPages;
+            const numPages = this.numPages;
             if(page > numPages) page = numPages;
             if(page < 1) page = 1;
 

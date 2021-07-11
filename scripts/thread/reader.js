@@ -190,7 +190,7 @@ function PDFReader(options, file) {
                 if(!scale) scale = 96.0 / 72.0;
 
                 const page = await self.doc.getPage(i);
-                const viewport = page.viewport({scale});
+                const viewport = page.getViewport({scale});
 
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
@@ -255,13 +255,14 @@ function PDFReader(options, file) {
             WORKER[targetWorkerUid].worker.postMessage({
                 "type": "getPageImage",
                 "data": page,
+                "scale": options.scale,
                 "return": id,
             });
 
             targetWorkerUpdate();
         }
 
-        drawPageCanvas(options, canvas, page) {
+        drawPageCanvas(canvas, page, scale = null) {
             if(options == null || canvas == null || page == null) throw new Error("Please input parameters");
             if(canvas instanceof HTMLCanvasElement) {
                 if(canvas.transferControlToOffscreen) canvas = canvas.transferControlToOffscreen();
@@ -274,6 +275,7 @@ function PDFReader(options, file) {
                 "type": "drawPageCanvas",
                 "data": canvas,
                 "page": page,
+                "scale": scale,
             }, [canvas]);
 
             targetWorkerUpdate();
