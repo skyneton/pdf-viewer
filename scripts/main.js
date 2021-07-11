@@ -15,6 +15,8 @@ const PageViewer = () => {
 
     let beforeTouchMovePageTime = Date.now();
 
+    let reader;
+
     const touchMoveData = {
         maxZoomScale: 5,
         nowZoomScale: 1,
@@ -33,6 +35,11 @@ const PageViewer = () => {
 
     const getPDFPageCanvas = i => {
         const canvas = document.createElement("canvas");
+
+        if(reader != null) {
+            reader.drawPageCanvas(canvas, 2 * (96.0 / 72.0), i);
+            return canvas;
+        }
 
         doc.getPage(i).then(page => {
             const viewport = page.getViewport({scale: 2 * (96.0 / 72.0)});
@@ -54,7 +61,7 @@ const PageViewer = () => {
         sizeFitValue();
     }
 
-    const getPDFPageImage = i => {
+    const getPDFPageView = i => {
         const imageBox = document.createElement("div");
         imageBox.setAttribute("class", "pageViewer");
         imageBox.setAttribute("pageInfo", i);
@@ -154,7 +161,7 @@ const PageViewer = () => {
             return;
         }
 
-        const pageViewer = getPDFPageImage(nowPage + nowDirection);
+        const pageViewer = getPDFPageView(nowPage + nowDirection);
         
 
         if(direction == nowDirection && pageViewers.length >= 2) {
@@ -399,12 +406,28 @@ const PageViewer = () => {
     const getDocument = async files => {
         for(let i = 0; i < files.length; i++) {
             if(files[i].type === "application/pdf") {
-                window.a = doc = await pdfjsLib.getDocument(await fileReaderAsync(files[i])).promise;
-                document.getElementsByClassName("canvas")[0].style.display = null;
-                document.getElementsByClassName("fileInput")[0].style.display = "none";
-                viewer.setPage(1);
+                try {
+                    reader = new PDFReader({
+                        numWorkers: 2,
+                        success(pages) {
+                            document.getElementsByClassName("canvas")[0].style.display = null;
+                            document.getElementsByClassName("fileInput")[0].style.display = "none";
+                            viewer.setPage(1);
 
-                document.getElementsByClassName("numPages")[0].innerText = doc.numPages;
+                            document.getElementsByClassName("numPages")[0].innerText = pages;
+                        },error(e) {
+                            console.log(e);
+                            reader = undefined;
+                        }
+                    });
+                }catch {
+                    doc = await pdfjsLib.getDocument(await fileReaderAsync(files[i])).promise;
+                    document.getElementsByClassName("canvas")[0].style.display = null;
+                    document.getElementsByClassName("fileInput")[0].style.display = "none";
+                    viewer.setPage(1);
+
+                    document.getElementsByClassName("numPages")[0].innerText = doc.numPages;
+                }
                 break;
             }
         }
@@ -490,8 +513,9 @@ const PageViewer = () => {
 
         async setPage(page) {
             if(page == null) return;
-            if(doc == null) return;
-            if(page > doc.numPages) page = doc.numPages;
+            if(reader == null && doc == null) return;
+            const numPages = reader.numPages || doc.numPages;
+            if(page > numPages) page = numPages;
             if(page < 1) page = 1;
 
             cleanPageViewers();
@@ -503,7 +527,7 @@ const PageViewer = () => {
             if(direction == 1 && pageViewers.length >= 2) target = pageViewers[1];
 
             if(target == null) {
-                target = getPDFPageImage(page);
+                target = getPDFPageView(page);
                 document.getElementsByClassName("pageContainer")[0].appendChild(target);
             }else {
                 target.setAttribute("pageInfo", page);
