@@ -16,8 +16,7 @@ const PageViewer = () => {
     const touchMoveData = {
         maxZoomScale: 5,
         nowZoomScale: 1,
-        beforeDistance: 0,
-        beforeTouchMoveTime: Date.now(),
+        beforeDistance: -1,
         beforeX: -1,
         beforeY: -1,
     };
@@ -101,6 +100,7 @@ const PageViewer = () => {
         if(timeout != null) clearTimeout(timeout);
 
         const scrollTarget = document.getElementsByClassName("containerViewer")[0];
+        const container = document.getElementsByClassName("pageContainer")[0];
 
         if(direction + nowDirection === 0 && pageViewers.length >= 2) {
             let target, destroy, imageCanvas, destroyImageCanvas;
@@ -131,13 +131,16 @@ const PageViewer = () => {
             destroy.setAttribute("hide", true);
             setHideViewer(target, false);
     
-            const subwidth = window.innerWidth >= 790 ? 150 : 0;
-            imageCanvas.style.width = `${window.innerWidth - subwidth - 10}px`;
-            imageCanvas.style.height = `${window.innerHeight}px`;
+            imageCanvas.style.width = `${container.offsetWidth}px`;
+            imageCanvas.style.height = `${container.offsetHeight}px`;
             
             timeout = setTimeout(() => {
                 destroy.remove();
                 direction = 0;
+                if(imageCanvas) {
+                    imageCanvas.style.width = null;
+                    imageCanvas.style.height = null;
+                }
             }, DELAY);
 
             nowPage -= direction;
@@ -162,7 +165,6 @@ const PageViewer = () => {
         
         const imageCanvas = pageViewer.getElementsByClassName("imageCanvas")[0];
 
-        const container = document.getElementsByClassName("pageContainer")[0];
         setHideViewer(pageViewer, true, `${container.offsetWidth - 10}px`, `${container.offsetHeight}px`);
 
         const loc = document.getElementsByClassName("pageContainer")[0];
@@ -234,6 +236,9 @@ const PageViewer = () => {
     window.onmouseup = e => {
         const between = e.clientX - clicked.x;
 
+        if(Date.now() - beforeScrolledTime < 20) return;
+        if(document.getElementsByClassName("menu")[0].hasAttribute("show") && window.innerHeight - 40 < e.clientY) return;
+
         const percentWidth = window.innerWidth * 0.2;
         if(window.innerWidth < 790 && Date.now() - clicked.startClickTime < 150) {
             if(e.clientX >= window.innerWidth - percentWidth) {
@@ -249,7 +254,6 @@ const PageViewer = () => {
             if(!document.getElementsByClassName("currentPage")[0].isFocus && Math.abs(e.clientY - clicked.y) < window.innerHeight * 0.09) viewer.showMenu();
             return;
         }
-        if(Date.now() - beforeScrolledTime < 20) return;
 
         const dir = between < 0 ? 1 : -1;
         onDirectionChanged(dir);
@@ -264,26 +268,28 @@ const PageViewer = () => {
         }else {
             dragPageMove = true;
         }
+
+        if(e.touches.length == 2) {
+            touchMoveData.beforeDistance = -1;
+        }
     };
 
     window.ontouchmove = e => {
         if(e.touches.length != 2) return;
-        const now = Date.now();
-        if(now - touchMoveData.beforeTouchMoveTime < 10) return;
 
         const nowDistance = Math.abs(Math.sqrt((e.touches[0].screenX - e.touches[1].screenX) ** 2 + (e.touches[0].screenY - e.touches[1].screenY) ** 2));
-        const changeZoomPercent = (nowDistance - touchMoveData.beforeDistance) / 20;
+        const changeZoomPercent = (nowDistance - touchMoveData.beforeDistance) / 40;
         
         const screenX = (e.touches[0].screenX + e.touches[1].screenX) / 2;
         const screenY = (e.touches[0].screenX + e.touches[1].screenX) / 2;
 
-        if(isNaN(changeZoomPercent)) {
+        if(touchMoveData.beforeDistance < 0 || isNaN(changeZoomPercent)) {
             touchMoveData.beforeDistance = nowDistance;
-            touchMoveData.beforeTouchMoveTime = now;
             touchMoveData.beforeX = screenX;
             touchMoveData.beforeY = screenY;
             return;
         }
+
         let changedAmount = touchMoveData.nowZoomScale;
         touchMoveData.nowZoomScale += changeZoomPercent;
         touchMoveData.nowZoomScale = clamp(touchMoveData.nowZoomScale, 1, touchMoveData.maxZoomScale);
@@ -298,8 +304,8 @@ const PageViewer = () => {
         }else {
             const target = document.getElementsByClassName("containerViewer")[0];
 
-            const changeX = (screenX - touchMoveData.beforeX) * touchMoveData.nowZoomScale;
-            const changeY = (screenY - touchMoveData.beforeY) * touchMoveData.nowZoomScale
+            const changeX = Math.ceil((screenX - touchMoveData.beforeX) * touchMoveData.nowZoomScale);
+            const changeY = Math.ceil((screenY - touchMoveData.beforeY) * touchMoveData.nowZoomScale);
             if(changedAmount < 0) {
                 target.scrollLeft -= changeX;
                 target.scrollTop -= changeY;
@@ -310,12 +316,15 @@ const PageViewer = () => {
         }
 
         touchMoveData.beforeDistance = nowDistance;
-        touchMoveData.beforeTouchMoveTime = now;
         touchMoveData.beforeX = screenX;
         touchMoveData.beforeY = screenY;
     }
 
     window.ontouchend = e => {
+        if(e.touches.length == 2) {
+            touchMoveData.beforeDistance = -1;
+        }
+        
         if(!dragPageMove) {
             if(e.touches.length == 0) dragPageMove = true;
             return;
@@ -323,6 +332,7 @@ const PageViewer = () => {
         if(Date.now() - beforeTouchMovePageTime < 10) return;
         beforeTouchMovePageTime = Date.now();
         if(Date.now() - beforeScrolledTime < 20) return;
+        if(document.getElementsByClassName("menu")[0].hasAttribute("show") && window.innerHeight - 40 < e.clientY) return;
 
         const between = e.changedTouches[0].screenX - clicked.x;
         const percentWidth = window.innerWidth * 0.12;
@@ -346,16 +356,21 @@ const PageViewer = () => {
     };
 
     document.onfullscreenchange = () => {
-        const fullMenu = document.getElementsByClassName("fullModeMenu");
+        const fullMenu = document.getElementsByClassName("fullModeMenu")[0];
         if(!document.fullscreenElement) {
             fullMenu.removeAttribute("full");
         }else {
-            if(!document.fullscreenElement.classList.includes("canvas")) {
+            if(!Object.values(document.fullscreenElement.classList).includes("canvas")) {
                 viewer.toggleFullScreen();
-                fullMenu.setAttribute("full", true);
             }
+            fullMenu.setAttribute("full", true);
         }
     }
+
+    document.getElementsByClassName("fullModeState")[0].onclick = document.getElementsByClassName("fullModeState")[1].onclick = e => {
+        e.preventDefault();
+        viewer.toggleFullScreen();
+    };
 
     window.oncontextmenu = e => {
         e.preventDefault();
@@ -483,6 +498,7 @@ const PageViewer = () => {
                 document.getElementsByClassName("pageContainer")[0].appendChild(target);
             }else {
                 target.setAttribute("pageInfo", page);
+                while(target.getElementsByTagName("canvas").length > 0) target.getElementsByTagName("canvas")[0].remove();
                 target.getElementsByClassName("imageCanvas")[0].appendChild(await getPDFPageCanvas(page));
             }
 
@@ -500,11 +516,11 @@ const PageViewer = () => {
 
             showTimeout = setTimeout(() => {
                 menu.removeAttribute("show");
-            }, 2000);
+            }, 2100);
         }
 
         toggleFullScreen() {
-            if(document.fullscreenElement == null || !document.fullscreenElement.classList.includes("canvas")) {
+            if(document.fullscreenElement == null || !Object.values(document.fullscreenElement.classList).includes("canvas")) {
                 const canvas = document.getElementsByClassName("canvas")[0];
                 canvas.requestFullscreen() || canvas.webkitRequestFullscreen() || canvas.mozRequestFullScreen() || canvas.msRequestFullscreen();
             }else {
