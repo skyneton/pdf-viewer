@@ -10,11 +10,14 @@
     -khtml-user-drag: none;
     -moz-user-drag: -moz-none;
     -ms-user-drag: none;
+}
 
+html {
     -ms-content-zooming: none;
     max-zoom: 1;
     min-zoom: 1;
 }
+
 .canvas {
     display: flex;
     position: fixed;
