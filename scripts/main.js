@@ -15,6 +15,8 @@ const PageViewer = () => {
 
     let reader;
 
+    let getPageInteval;
+
     const canvasList = [];
     const loadingList = [];
 
@@ -335,7 +337,13 @@ const PageViewer = () => {
     };
 
     window.ontouchmove = e => {
-        if(e.touches.length != 2) return;
+        const target = document.getElementsByClassName("containerViewer")[0];
+
+        if(e.touches.length != 2) {
+            offset.x = target.scrollLeft;
+            offset.y = target.scrollTop;
+            return;
+        }
 
         const nowDistance = Math.abs(Math.sqrt((e.touches[0].screenX - e.touches[1].screenX) ** 2 + (e.touches[0].screenY - e.touches[1].screenY) ** 2));
         const changeZoomPercent = (nowDistance - touchMoveData.beforeDistance) / 40;
@@ -362,22 +370,20 @@ const PageViewer = () => {
             touchMoveData.beforeX = screenX;
             touchMoveData.beforeY = screenY;
         }else if(Math.abs(changedAmount) > 0.005) {
-            const target = document.getElementsByClassName("containerViewer")[0];
-
-            const changeX = changedAmount * (screenX + offset.x);
-            const changeY = changedAmount * (screenY + offset.y);
+            const changeX = changedAmount * (screenX + offset.x) / touchMoveData.nowZoomScale;
+            const changeY = changedAmount * (screenY + offset.y) / touchMoveData.nowZoomScale;
 
             offset.x += changeX;
             offset.y += changeY;
-            offset.x = clamp(offset.x, 0, target.scrollWidth - window.innerHeight / 1.8);
-            offset.y = clamp(offset.y, 0, target.scrollHeight - window.innerHeight / 1.8);
+            offset.x = clamp(offset.x, 0, target.scrollWidth - window.innerHeight / 2);
+            offset.y = clamp(offset.y, 0, target.scrollHeight - window.innerHeight / 2);
 
             if(changedAmount < 0) {
-                target.scrollLeft -= changeX;
-                target.scrollTop -= changeY;
+                target.scrollLeft = offset.x;
+                target.scrollTop = offset.y;
             }else if(changedAmount > 0) {
-                target.scrollLeft += changeX;
-                target.scrollTop += changeY;
+                target.scrollLeft = offset.x;
+                target.scrollTop = offset.y;
             }
         }
 
@@ -454,13 +460,14 @@ const PageViewer = () => {
     const getDocument = async files => {
         for(let i = 0; i < files.length; i++) {
             if(files[i].type === "application/pdf") {
+                clearInterval(getPageInteval);
                 while(loadingList.length > 0) loadingList.pop();
                 while(canvasList.length > 0) canvasList.pop();
 
                 try {
                     if(HTMLCanvasElement.prototype.transferControlToOffscreen) {
                         reader = new PDFReader({
-                            numWorkers: 2,
+                            numWorkers: 5,
                             file: files[i],
                             success(pages) {
                                 document.getElementsByClassName("canvas")[0].style.display = null;
@@ -468,6 +475,12 @@ const PageViewer = () => {
                                 viewer.setPage(1);
 
                                 document.getElementsByClassName("numPages")[0].innerText = pages;
+
+                                let i = 0;
+                                getPageInteval = setInterval(() => {
+                                    if(++i > pages) return clearInterval(getPageInteval);
+                                    if(Object.keys(loadingList).length < 50) getPDFPageCanvasOrImage(i);
+                                }, 1e3);
                             },error(e) {
                                 console.error(e);
                                 reader = undefined;
