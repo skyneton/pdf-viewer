@@ -230,20 +230,36 @@ function PDFReader(options) {
             }
         };
 
-        const drawPageCanvas = async (packet) => {
+        const drawPageCanvas = async packet => {
             try {
                 if(!packet.scale) packet.scale = 96.0 / 72.0;
 
                 const page = await self.doc.getPage(packet.page);
-                const viewport = page.getViewport({"scale": packet.scale});
+                let viewport = page.getViewport({"scale": packet.scale});
+
+                let scale = 1;
+                if(packet.maxHeight || packet.maxWidth) {
+                    let scaleX = 1;
+                    if(packet.maxWidth < viewport.width) scaleX = packet.maxWidth / viewport.width;
+                    let scaleY = 1;
+                    if(packet.maxHeight < viewport.height) scaleY = packet.maxHeight / viewport.height;
+                    scale = Math.min(scaleX, scaleY);
+                }
+
+                if(packet.maxPixels) {
+                    const pixels = (viewport.width * scale) * (viewport.height * scale);
+                    if(pixels > packet.maxPixels) {
+                        scale *= packet.maxPixels / pixels;
+                    }
+                }
+
+                if(scale != 1) viewport = page.getViewport({"scale": packet.scale * scale});
 
                 packet.data.width = viewport.width;
                 packet.data.height = viewport.height;
 
                 const ctx = packet.data.getContext("2d", { alpha: false });
-                ctx.fillStyle = "aqua"
-                ctx.fillRect(0, 0, 1000, 1000);
-                // await page.render({canvasContext: ctx, viewport}).promise;
+                await page.render({canvasContext: ctx, viewport}).promise;
 
                 self.postMessage({
                     "type": "success",
@@ -389,6 +405,9 @@ function PDFReader(options) {
                 "data": options.canvas,
                 "page": options.page,
                 "scale": options.scale,
+                "maxWidth": options.maxWidth,
+                "maxHeight": options.maxHeight,
+                "maxPixels": options.pixels,
                 "return": id,
             }, [options.canvas]);
 

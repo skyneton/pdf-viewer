@@ -101,6 +101,12 @@
     margin: 0;
 }
 
+*[loading] {
+    background-image: url("../loading.png");
+    background-size: cover;
+    background-position: center;
+}
+
 .leftPageMoveBox, .rightPageMoveBox {
     display: none;
     width: 50px;

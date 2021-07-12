@@ -15,9 +15,6 @@ const PageViewer = () => {
 
     let reader;
 
-    let getPageInteval;
-
-    const canvasList = [];
     const loadingList = [];
 
     const offset = {
@@ -41,42 +38,40 @@ const PageViewer = () => {
         }
     };
 
-    const getPDFPageCanvasOrImage = i => {
-        if(canvasList[i - 1]) {
-            return canvasList[i - 1];
-        }
-
+    const getPDFPageCanvas = i => {
         if(loadingList[i - 1]) {
             return loadingList[i - 1];
         }
+
+        const canvas = document.createElement("canvas");
+        canvas.setAttribute("loading", true);
         
         if(reader != null) {
-            const image = document.createElement("img");
-            image.src = "../loading.png";
-
-            image.onload = () => {
-                if(image.src.startsWith("blob:")) URL.revokeObjectURL(image.src);
-            }
-
-            const success = url => {
-                image.src = url;
+            const success = () => {
+                canvas.removeAttribute("loading");
                 delete loadingList[i - 1];
-                canvasList[i - 1] = image;
             };
 
             // window.a = offscreen;
-            reader.getPageImage({
+            const post = {
                 success,
+                canvas,
                 page: i,
                 scale: 96.0 / 72.0 * 2,
-                toURL: true,
-            });
+                maxWidth: 32767,
+                maxHeight: 32767,
+                maxPixels: 268435456,
+            };
+            if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                post.maxWidth = post.maxHeight = 4096;
+                post.maxPixels = 16777216;
+            }
 
-            loadingList[i - 1] = image;
-            return image;
+            reader.drawPageCanvas(post);
+
+            loadingList[i - 1] = canvas;
+            return canvas;
         }
-
-        const canvas = document.createElement("canvas");
 
         doc.getPage(i).then(page => {
             const viewport = page.getViewport({scale: 96.0 / 72.0 * 0.8});
@@ -91,8 +86,8 @@ const PageViewer = () => {
                 viewport,
             });
 
+            canvas.removeAttribute("loading");
             delete loadingList[i - 1];
-            canvasList[i - 1] = canvas;
         });
 
         loadingList[i - 1] = canvas;
@@ -112,7 +107,7 @@ const PageViewer = () => {
         const imageCanvas = document.createElement("div");
         imageCanvas.setAttribute("class", "imageCanvas");
 
-        imageCanvas.appendChild(getPDFPageCanvasOrImage(i));
+        imageCanvas.appendChild(getPDFPageCanvas(i));
         imageBox.appendChild(imageCanvas);
         return imageBox;
     };
@@ -460,9 +455,7 @@ const PageViewer = () => {
     const getDocument = async files => {
         for(let i = 0; i < files.length; i++) {
             if(files[i].type === "application/pdf") {
-                clearInterval(getPageInteval);
                 while(loadingList.length > 0) loadingList.pop();
-                while(canvasList.length > 0) canvasList.pop();
 
                 try {
                     if(HTMLCanvasElement.prototype.transferControlToOffscreen) {
@@ -475,12 +468,6 @@ const PageViewer = () => {
                                 viewer.setPage(1);
 
                                 document.getElementsByClassName("numPages")[0].innerText = pages;
-
-                                let i = 0;
-                                getPageInteval = setInterval(() => {
-                                    if(++i > pages) return clearInterval(getPageInteval);
-                                    if(Object.keys(loadingList).length < 50) getPDFPageCanvasOrImage(i);
-                                }, 1e3);
                             },error(e) {
                                 console.error(e);
                                 reader = undefined;
@@ -592,8 +579,8 @@ const PageViewer = () => {
             return touchMoveData.nowZoomScale;
         }
 
-        get canvas() {
-            return canvasList;
+        get loadingList() {
+            return loadingList;
         }
 
         async setPage(page) {
@@ -618,7 +605,7 @@ const PageViewer = () => {
                 target.setAttribute("pageInfo", page);
                 while(target.getElementsByTagName("canvas").length > 0) target.getElementsByTagName("canvas")[0].remove();
                 while(target.getElementsByTagName("img").length > 0) target.getElementsByTagName("img")[0].remove();
-                target.getElementsByClassName("imageCanvas")[0].appendChild(getPDFPageCanvasOrImage(page));
+                target.getElementsByClassName("imageCanvas")[0].appendChild(getPDFPageCanvas(page));
             }
 
             nowPage = page;
