@@ -124,6 +124,28 @@ function PDFReader(options) {
             return array;
         };
 
+        const viewportResizingScale = (width = 1, height = 1, maxHeight, maxWidth, maxPixels) => {
+            let scale = 1;
+            if(width == 0 || height == 0) return 1;
+
+            if(maxHeight || maxWidth) {
+                let scaleX = 1;
+                if(maxWidth < width) scaleX = maxWidth / width;
+                let scaleY = 1;
+                if(maxHeight < height) scaleY = maxHeight / height;
+                scale = Math.min(scaleX, scaleY);
+            }
+
+            if(maxPixels) {
+                const pixels = (width * scale) * (height * scale);
+                if(pixels > maxPixels) {
+                    scale *= maxPixels / pixels;
+                }
+            }
+
+            return scale;
+        }
+
         const initalizer = async packet => {
             for(let i = 0; i < packet.url.length; i++) {
                 importScripts(packet.url[i]);
@@ -161,11 +183,13 @@ function PDFReader(options) {
 
         const getPageImage = async packet => {
             try {
-                let scale = packet.scale;
-                if(!scale) scale = 96.0 / 72.0;
+                if(!packet.scale) packet.scale = 96.0 / 72.0;
 
                 const page = await self.doc.getPage(packet.data);
-                const viewport = page.getViewport({scale});
+                let viewport = page.getViewport({"scale": packet.scale});
+                
+                const scale = viewportResizingScale(viewport.width, viewport.height, packet.maxHeight, packet.maxWidth, packet.maxPixels);
+                if(scale != 1) viewport = page.getViewport({"scale": packet.scale * scale});
 
                 const canvas = new OffscreenCanvas(viewport.width, viewport.height);
 
@@ -193,11 +217,13 @@ function PDFReader(options) {
 
         const getImageBitMap = async packet => {
             try {
-                let scale = packet.scale;
-                if(!scale) scale = 96.0 / 72.0;
+                if(!packet.scale) packet.scale = 96.0 / 72.0;
 
                 const page = await self.doc.getPage(packet.data);
-                const viewport = page.getViewport({scale});
+                let viewport = page.getViewport({"scale": packet.scale});
+
+                const scale = viewportResizingScale(viewport.width, viewport.height, packet.maxHeight, packet.maxWidth, packet.maxPixels);
+                if(scale != 1) viewport = page.getViewport({"scale": packet.scale * scale});
 
                 const canvas = new OffscreenCanvas(viewport.width, viewport.height);
                 const ctx = canvas.getContext("2d", { alpha: false });
@@ -237,22 +263,7 @@ function PDFReader(options) {
                 const page = await self.doc.getPage(packet.page);
                 let viewport = page.getViewport({"scale": packet.scale});
 
-                let scale = 1;
-                if(packet.maxHeight || packet.maxWidth) {
-                    let scaleX = 1;
-                    if(packet.maxWidth < viewport.width) scaleX = packet.maxWidth / viewport.width;
-                    let scaleY = 1;
-                    if(packet.maxHeight < viewport.height) scaleY = packet.maxHeight / viewport.height;
-                    scale = Math.min(scaleX, scaleY);
-                }
-
-                if(packet.maxPixels) {
-                    const pixels = (viewport.width * scale) * (viewport.height * scale);
-                    if(pixels > packet.maxPixels) {
-                        scale *= packet.maxPixels / pixels;
-                    }
-                }
-
+                const scale = viewportResizingScale(viewport.width, viewport.height, packet.maxHeight, packet.maxWidth, packet.maxPixels);
                 if(scale != 1) viewport = page.getViewport({"scale": packet.scale * scale});
 
                 packet.data.width = viewport.width;
@@ -348,6 +359,9 @@ function PDFReader(options) {
                 "data": options.page,
                 "scale": options.scale,
                 "toURL": options.toURL,
+                "maxWidth": options.maxWidth,
+                "maxHeight": options.maxHeight,
+                "maxPixels": options.pixels,
                 "return": id,
             });
 
@@ -373,6 +387,9 @@ function PDFReader(options) {
                 "type": "getImageBitMap",
                 "data": options.page,
                 "scale": options.scale,
+                "maxWidth": options.maxWidth,
+                "maxHeight": options.maxHeight,
+                "maxPixels": options.pixels,
                 "return": id,
             });
 
