@@ -1,19 +1,26 @@
 const PageViewer = () => {
     let direction = 0;
-    const clicked = {x: 0, y: 0, startClickTime: Date.now()};
     let timeout;
     let doc;
     let nowPage = 1;
     const DELAY = 705;
     let showTimeout;
     let loadingPage;
-    let beforeScrolledTime = Date.now();
     let beforeViewportPageLeft = 0;
     let dragPageMove = true;
 
     let beforeKeyPressTime = Date.now();
 
     let reader;
+
+    const pointerData = {
+        x: 0,
+        y: 0,
+        startClickTime: Date.now(),
+
+        beforeScrolledTime: Date.now(),
+        beforeClickedTime: Date.now(),
+    };
 
     const prevWorker = {
         prevLoadingComplete: [],
@@ -227,7 +234,7 @@ const PageViewer = () => {
                 prevWorker.loadingAmount = 0;
                 if(reader != null) reader.close();
 
-                document.title = `PDF Viewer - ${file.name}`;
+                document.title = `PDF Viewer - ${files[i].name}`;
 
                 try {
                     if(HTMLCanvasElement.prototype.transferControlToOffscreen) {
@@ -453,9 +460,9 @@ const PageViewer = () => {
     }
 
     window.onmousedown = e => {
-        clicked.x = e.clientX;
-        clicked.y = e.clientY;
-        clicked.startClickTime = Date.now();
+        pointerData.x = e.clientX;
+        pointerData.y = e.clientY;
+        pointerData.startClickTime = Date.now();
     };
 
     window.onmousemove = e => {
@@ -472,28 +479,32 @@ const PageViewer = () => {
             return;
         }
 
-        if(Date.now() - beforeScrolledTime < 50) return;
+        const now = Date.now();
+        if(now - pointerData.beforeScrolledTime < 50 || now - pointerData.beforeClickedTime < 20) return;
 
-        const between = e.clientX - clicked.x;
+        const between = e.clientX - pointerData.x;
 
         const percentWidth = window.innerWidth * 0.2;
-        if(window.innerWidth < 790 && Date.now() - clicked.startClickTime < 150 && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.clientY)) {
+        if(window.innerWidth < 790 && Date.now() - pointerData.startClickTime < 150 && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.clientY)) {
             if(e.clientX >= window.innerWidth - percentWidth) {
+                pointerData.beforeClickedTime = now;
                 onDirectionChanged(1);
                 return;
             }else if(e.clientX <= percentWidth) {
+                pointerData.beforeClickedTime = now;
                 onDirectionChanged(-1);
                 return;
             }
         }
 
         if(Math.abs(between) < window.innerWidth * 0.085) {
-            if(!document.getElementsByClassName("currentPage")[0].isFocus && Math.abs(e.clientY - clicked.y) < window.innerHeight * 0.09) viewer.showMenu();
+            if(!document.getElementsByClassName("currentPage")[0].isFocus && Math.abs(e.clientY - pointerData.y) < window.innerHeight * 0.09) viewer.showMenu();
             return;
         }
 
         const dir = between < 0 ? 1 : -1;
         onDirectionChanged(dir);
+        pointerData.beforeClickedTime = now;
     };
 
     window.ontouchstart = e => {
@@ -501,9 +512,9 @@ const PageViewer = () => {
             endScrollMove();
         }
 
-        clicked.x = e.touches[0].screenX;
-        clicked.y = e.touches[0].screenY;
-        clicked.startClickTime = Date.now();
+        pointerData.x = e.touches[0].screenX;
+        pointerData.y = e.touches[0].screenY;
+        pointerData.startClickTime = Date.now();
 
         if(e.touches.length > 1) {
             dragPageMove = false;
@@ -595,27 +606,31 @@ const PageViewer = () => {
             return;
         }
         
-        if(Date.now() - beforeScrolledTime < 150) return;
+        const now = Date.now();
+        if(now - pointerData.beforeScrolledTime < 50 || now - pointerData.beforeClickedTime < 100) return;
 
-        const between = e.changedTouches[0].screenX - clicked.x;
+        const between = e.changedTouches[0].screenX - pointerData.x;
         const percentWidth = window.innerWidth * 0.12;
-        if(Math.abs(e.changedTouches[0].screenY - clicked.y) < Math.min(100, percentWidth) && Math.abs(between) < Math.min(100, percentWidth) && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.changedTouches[0].clientY)) {
+        if(Math.abs(e.changedTouches[0].screenY - pointerData.y) < Math.min(100, percentWidth) && Math.abs(between) < Math.min(100, percentWidth) && (!document.getElementsByClassName("menu")[0].hasAttribute("show") || window.innerHeight - 40 >= e.changedTouches[0].clientY)) {
             if(window.innerWidth < 790 && e.changedTouches[0].pageX >= window.innerWidth - percentWidth) {
+                pointerData.beforeScrolledTime = now;
                 onDirectionChanged(1);
                 return;
             }else if(window.innerWidth < 790 && e.changedTouches[0].screenX <= percentWidth) {
+                pointerData.beforeScrolledTime = now;
                 onDirectionChanged(-1);
                 return;
             }
         }
 
         if(Math.abs(between) < window.innerWidth * 0.085) {
-            if(!document.getElementsByClassName("currentPage")[0].isFocus && Math.abs(e.changedTouches[0].screenY - clicked.y) < window.innerHeight * 0.09) viewer.showMenu();
+            if(!document.getElementsByClassName("currentPage")[0].isFocus && Math.abs(e.changedTouches[0].screenY - pointerData.y) < window.innerHeight * 0.09) viewer.showMenu();
             return;
         }
 
         const dir = between < 0 ? 1 : -1;
         onDirectionChanged(dir);
+        pointerData.beforeScrolledTime = now;
     };
 
     document.onfullscreenchange = () => {
@@ -702,7 +717,7 @@ const PageViewer = () => {
 
     document.getElementsByClassName("containerViewer")[0].onscroll = () => {
         const nowScrollLeft = document.getElementsByClassName("containerViewer")[0].scrollLeft;
-        if(Math.abs(nowScrollLeft - beforeViewportPageLeft)) beforeScrolledTime = Date.now();
+        if(Math.abs(nowScrollLeft - beforeViewportPageLeft)) pointerData.beforeScrolledTime = Date.now();
         
         beforeViewportPageLeft = document.getElementsByClassName("containerViewer")[0].scrollLeft;
     }
