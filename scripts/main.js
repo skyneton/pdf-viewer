@@ -56,8 +56,8 @@ const PageViewer = () => {
                 maxPixels: 268435456,
             };
             if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                post.maxWidth = post.maxHeight = 4096;
-                post.maxPixels = 16777216;
+                post.maxWidth = post.maxHeight = 2048;
+                post.maxPixels = 3145728;
             }
 
             reader.drawPageCanvas(post);
@@ -226,6 +226,8 @@ const PageViewer = () => {
                 prevWorker.prevLoadingComplete = [];
                 prevWorker.loadingAmount = 0;
                 if(reader != null) reader.close();
+
+                document.title = `PDF Viewer - ${file.name}`;
 
                 try {
                     if(HTMLCanvasElement.prototype.transferControlToOffscreen) {
