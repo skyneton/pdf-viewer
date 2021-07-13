@@ -18,8 +18,8 @@ const PageViewer = () => {
     const prevWorker = {
         prevLoadingComplete: [],
         prevLoading: [],
+        loadingAmount: 0,
     };
-
 
     const offset = {
         x: 0,
@@ -33,24 +33,19 @@ const PageViewer = () => {
         beforeX: -1,
         beforeY: -1,
     };
-
-    const getPDFPageCanvas = i => {
-        if(prevWorker.prevLoadingComplete[i - 1]) return prevWorker.prevLoadingComplete[i - 1];
-        if(prevWorker.prevLoading[i - 1]) return prevWorker.prevLoading[i - 1];
-
-        const canvas = document.createElement("canvas");
-        canvas.setAttribute("loading", true);
+        
+    var loadCanvas = (canvas, i) => {
+        prevWorker.loadingAmount++;
         
         if(reader != null) {
             const success = () => {
                 canvas.removeAttribute("loading");
-                if(prevWorker.prevLoading[i - 1]) {
-                    prevWorker.prevLoadingComplete[i - 1] = prevWorker.prevLoading[i - 1];
-                    delete prevWorker.prevLoading[i - 1];
-                }
+                prevWorker.loadingAmount--;
+                prevWorker.prevLoadingComplete[i - 1] = prevWorker.prevLoading[i - 1];
+                delete prevWorker.prevLoading[i - 1];
+                if(Object.keys(prevWorker.prevLoading).length <= 0) prevWorker.prevLoading = [];
             };
 
-            // window.a = offscreen;
             const post = {
                 success,
                 canvas,
@@ -68,10 +63,10 @@ const PageViewer = () => {
             reader.drawPageCanvas(post);
 
             prevWorker.prevLoading[i - 1] = canvas;
-            return canvas;
+            return;
         }
 
-        doc.getPage(i).then(page => {
+        doc.getPage(i).then(async page => {
             const viewport = page.getViewport({scale: 96.0 / 72.0 * 0.8});
 
             canvas.width = viewport.width;
@@ -79,50 +74,72 @@ const PageViewer = () => {
 
             const ctx = canvas.getContext("2d", { alpha: false });
 
-            page.render({
+            await page.render({
                 canvasContext: ctx,
                 viewport,
-            });
+            }).promise;
 
             canvas.removeAttribute("loading");
-            if(prevWorker.prevLoading[i - 1]) {
-                prevWorker.prevLoadingComplete[i - 1] = prevWorker.prevLoading[i - 1];
-                delete prevWorker.prevLoading[i - 1];
-            }
+            prevWorker.loadingAmount--;
+            prevWorker.prevLoadingComplete[i - 1] = prevWorker.prevLoading[i - 1];
+            delete prevWorker.prevLoading[i - 1];
+            if(Object.keys(prevWorker.prevLoading).length <= 0) prevWorker.prevLoading = [];
         });
 
         prevWorker.prevLoading[i - 1] = canvas;
+    };
+
+    const getPDFPageCanvas = i => {
+        if(prevWorker.prevLoadingComplete[i - 1]) return prevWorker.prevLoadingComplete[i - 1];
+        if(prevWorker.prevLoading[i - 1]) return prevWorker.prevLoading[i - 1];
+
+        const canvas = document.createElement("canvas");
+        canvas.setAttribute("loading", true);
+
+        loadCanvas(canvas, i);
+
         return canvas;
     };
-    
+
     const cleanPageViewers = () => {
         const pageViewers = [...document.getElementsByClassName("pageViewer")];
         for(let i = 0; i < pageViewers.length; i++) {
-            if(pageViewers[i].offsetWidth === 0 || pageViewers[i].getElementsByTagName("img").length <= 0 && pageViewers[i].getElementsByTagName("canvas").length <= 0 || !pageViewers[i].hasAttribute("hide") && pageViewers[i].hasAttribute("pageInfo") && pageViewers[i].getAttribute("pageInfo") != nowPage)
+            const imageList = pageViewers[i].getElementsByTagName("img");
+            const canvasList = pageViewers[i].getElementsByTagName("canvas");
+            if(pageViewers[i].offsetWidth === 0 || imageList.length <= 0 && canvasList.length <= 0 || !pageViewers[i].hasAttribute("hide") && pageViewers[i].hasAttribute("pageInfo") && pageViewers[i].getAttribute("pageInfo") != nowPage) {
+                for(let i = 0, len = imageList.length; i < len; i++) imageList[i].cancel = true;
+                for(let i = 0, len = canvasList.length; i < len; i++) canvasList[i].cancel = true;
                 pageViewers[i].remove();
+            }
         }
     };
 
     const cleanAndPrevLoad = page => {
-        const prevLoading = prevWorker.prevLoading;
-        const prevLoadingKeys = Object.keys(prevLoading);
-
-        const prevLoadingComplete = prevWorker.prevLoadingComplete;
-        const prevLoadingCompleteKeys = Object.keys(prevLoadingComplete);
+        const prevLoadingKeys = Object.keys(prevWorker.prevLoading);
+        const prevLoadingCompleteKeys = Object.keys(prevWorker.prevLoadingComplete);
 
         for(let i = 0, len = prevLoadingKeys.length; i < len; i++) {
             const key = prevLoadingKeys[i];
-            if(Math.abs(key - page) > 5) delete(prevLoading[key]);
+            if(Math.abs(key - page) > 5) delete prevWorker.prevLoading[key];
         }
+        if(Object.keys(prevWorker.prevLoading).length <= 0) prevWorker.prevLoading = [];
 
         for(let i = 0, len = prevLoadingCompleteKeys.length; i < len; i++) {
             const key = prevLoadingCompleteKeys[i];
-            if(Math.abs(key - page) > 5) delete(prevLoadingComplete[key]);
+            if(Math.abs(key - page) > 5) delete prevWorker.prevLoadingComplete[key];
         }
+        if(Object.keys(prevWorker.prevLoadingComplete).length <= 0) prevWorker.prevLoadingComplete = [];
 
-        if(page - 1 >= 1) getPDFPageCanvas(page - 1);
-        if(page + 1 <= viewer.numPages) getPDFPageCanvas(page + 1);
-        if(page + 2 <= viewer.numPages) getPDFPageCanvas(page + 2);
+        if(prevWorker.loadingAmount <= 1) {
+            if(direction <= 0) {
+                if(page - 1 >= 1) getPDFPageCanvas(page - 1);
+                if(page - 2 >= 1) getPDFPageCanvas(page - 2);
+            }
+            if(direction >= 0) {
+                if(page + 1 <= viewer.numPages) getPDFPageCanvas(page + 1);
+                if(page + 2 <= viewer.numPages) getPDFPageCanvas(page + 2);
+            }
+        }
     };
 
     const setPageInfo = (page = nowPage) => {
@@ -131,7 +148,7 @@ const PageViewer = () => {
 
         const percent = clamp(page / viewer.numPages, 0, 1);
         document.getElementsByClassName("scrollBarItem")[0].style.width = `${percent * 100}%`;
-    }
+    };
 
     const getPDFPageView = i => {
         const imageBox = document.createElement("div");
@@ -188,8 +205,68 @@ const PageViewer = () => {
         const page = Math.round(viewer.numPages * percent);
         setPageInfo(page);
         viewer.setPage(page);
-        showMenu();
+        viewer.showMenu();
     }
+    
+    const fileReaderAsync = file => {
+        return new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                resolve(new Uint8Array(reader.result));
+            }
+
+            reader.readAsArrayBuffer(file);
+        });
+    };
+
+    const getDocument = async files => {
+        for(let i = 0; i < files.length; i++) {
+            if(files[i].type === "application/pdf") {
+                prevWorker.prevLoading = [];
+                prevWorker.prevLoadingComplete = [];
+                prevWorker.loadingAmount = 0;
+                if(reader != null) reader.close();
+
+                try {
+                    if(HTMLCanvasElement.prototype.transferControlToOffscreen) {
+                        reader = new PDFReader({
+                            numWorkers: 5,
+                            file: files[i],
+                            success(pages) {
+                                document.getElementsByClassName("canvas")[0].style.display = null;
+                                document.getElementsByClassName("fileInput")[0].style.display = "none";
+                                viewer.setPage(1);
+
+                                document.getElementsByClassName("numPages")[0].innerText = pages;
+                            },error(e) {
+                                console.error(e);
+                                reader = undefined;
+                            }
+                        });
+                    }
+                }catch(e) {
+                    console.error(e);
+                }finally {
+                    if(!reader) {
+                        doc = await pdfjsLib.getDocument(await fileReaderAsync(files[i])).promise;
+                        document.getElementsByClassName("canvas")[0].style.display = null;
+                        document.getElementsByClassName("fileInput")[0].style.display = "none";
+                        viewer.setPage(1);
+
+                        document.getElementsByClassName("numPages")[0].innerText = viewer.numPages;
+                    }
+                }
+                break;
+            }
+        }
+    };
+
+    const sizeFitValue = () => {
+        const text = document.getElementsByClassName("currentPageWidth")[0];
+        const input = document.getElementsByClassName("currentPage")[0];
+        text.innerText = input.value;
+        input.style.width = `${text.offsetWidth}px`;
+    };
 
     const onDirectionChanged = async nowDirection => {
         if(reader == null && doc == null || nowDirection != 1 && nowDirection != -1 || nowPage + nowDirection < 1 || nowPage + nowDirection > viewer.numPages || nowPage + nowDirection == loadingPage) return;
@@ -234,7 +311,14 @@ const PageViewer = () => {
             imageCanvas.style.height = `${container.offsetHeight}px`;
             
             timeout = setTimeout(() => {
-                destroy.remove();
+                if(destroy) {
+                    const canvasList = destroy.getElementsByTagName("canvas");
+                    const imageList = destroy.getElementsByTagName("img");
+                    for(let i = 0, len = imageList.length; i < len; i++) imageList[i].cancel = true;
+                    for(let i = 0, len = canvasList.length; i < len; i++) canvasList[i].cancel = true;
+
+                    destroy.remove();
+                }
                 direction = 0;
                 if(imageCanvas) {
                     imageCanvas.style.width = null;
@@ -246,21 +330,29 @@ const PageViewer = () => {
             direction = nowDirection;
 
             setPageInfo();
+
+            delete prevWorker.prevLoadingComplete[nowPage - 1];
+            delete prevWorker.prevLoading[nowPage - 1];
+            cleanAndPrevLoad(nowPage);
             return;
         }
 
         const pageViewer = getPDFPageView(nowPage + nowDirection);
         
-
         if(direction == nowDirection && pageViewers.length >= 2) {
+            let destroy = pageViewers[0];
             if(direction == -1) {
-                pageViewers[1].remove();
+                destroy = pageViewers[1];
             }
-            else {
-                pageViewers[0].remove();
+
+            if(destroy) {
+                const canvasList = destroy.getElementsByTagName("canvas");
+                const imageList = destroy.getElementsByTagName("img");
+                for(let i = 0, len = imageList.length; i < len; i++) imageList[i].cancel = true;
+                for(let i = 0, len = canvasList.length; i < len; i++) canvasList[i].cancel = true;
+                destroy.remove();
             }
         }
-
         
         const imageCanvas = pageViewer.getElementsByClassName("imageCanvas")[0];
 
@@ -293,6 +385,11 @@ const PageViewer = () => {
 
         timeout = setTimeout(() => {
             if(destroy) {
+                const canvasList = destroy.getElementsByTagName("canvas");
+                const imageList = destroy.getElementsByTagName("img");
+                for(let i = 0, len = imageList.length; i < len; i++) imageList[i].cancel = true;
+                for(let i = 0, len = canvasList.length; i < len; i++) canvasList[i].cancel = true;
+
                 destroy.remove();
             }
             direction = 0;
@@ -307,9 +404,27 @@ const PageViewer = () => {
 
         nowPage += direction = nowDirection;
         setPageInfo();
-        
+
+        delete prevWorker.prevLoadingComplete[nowPage - 1];
+        delete prevWorker.prevLoading[nowPage - 1];
         cleanAndPrevLoad(nowPage);
     };
+
+    window.ondragover = () => {
+        event.stopPropagation();
+        event.preventDefault();
+    };
+
+    window.ondrop = async e => {
+        event.stopPropagation();
+        event.preventDefault();
+        if(doc != null) return;
+        getDocument(e.target.files || e.dataTransfer.files);
+    };
+
+    window.oncontextmenu = e => {
+        e.preventDefault();
+    }
 
     window.onkeydown = e => {
         if(reader == null && doc == null || document.getElementsByClassName("currentPage")[0].isFocus) return;
@@ -345,17 +460,17 @@ const PageViewer = () => {
         if(document.getElementsByClassName("scrollBar")[0].touched) {
             scrollChange(e.clientX);
         }
-    }
+    };
 
     window.onmouseup = e => {
         if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
-        
+
         if(document.getElementsByClassName("scrollBar")[0].touched) {
             endScrollMove();
             return;
         }
 
-        if(Date.now() - beforeScrolledTime < 20) return;
+        if(Date.now() - beforeScrolledTime < 50) return;
 
         const between = e.clientX - clicked.x;
 
@@ -400,11 +515,11 @@ const PageViewer = () => {
     };
 
     window.ontouchmove = e => {
-        const target = document.getElementsByClassName("containerViewer")[0];
-
         if(document.getElementsByClassName("scrollBar")[0].touched) {
             scrollChange(e.touches[0].clientX);
         }
+
+        const target = document.getElementsByClassName("containerViewer")[0];
 
         if(e.touches.length != 2) {
             offset.x = target.scrollLeft;
@@ -478,7 +593,7 @@ const PageViewer = () => {
             return;
         }
         
-        if(Date.now() - beforeScrolledTime < 20) return;
+        if(Date.now() - beforeScrolledTime < 150) return;
 
         const between = e.changedTouches[0].screenX - clicked.x;
         const percentWidth = window.innerWidth * 0.12;
@@ -518,7 +633,7 @@ const PageViewer = () => {
         viewer.toggleFullScreen();
     };
 
-    document.getElementsByClassName("scrollBar")[0].onmousedown = e => {
+    document.getElementsByClassName("scroller")[0].onmousedown = e => {
         clearInterval(showTimeout);
         document.getElementsByClassName("menu")[0].setAttribute("show", true);
         scrollChange(e.clientX);
@@ -526,7 +641,7 @@ const PageViewer = () => {
         document.getElementsByClassName("scrollBar")[0].touched = true;
     };
 
-    document.getElementsByClassName("scrollBar")[0].ontouchstart = e => {
+    document.getElementsByClassName("scroller")[0].ontouchstart = e => {
         if(e.touches.length > 1) return;
 
         clearInterval(showTimeout);
@@ -534,73 +649,6 @@ const PageViewer = () => {
         scrollChange(e.clientX);
         
         document.getElementsByClassName("scrollBar")[0].touched = true;
-    }
-
-    window.oncontextmenu = e => {
-        e.preventDefault();
-    }
-    
-    const fileReaderAsync = file => {
-        return new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                resolve(new Uint8Array(reader.result));
-            }
-
-            reader.readAsArrayBuffer(file);
-        });
-    };
-
-    const getDocument = async files => {
-        for(let i = 0; i < files.length; i++) {
-            if(files[i].type === "application/pdf") {
-                prevWorker.prevLoading = [];
-                prevWorker.prevLoadingComplete = [];
-
-                try {
-                    if(HTMLCanvasElement.prototype.transferControlToOffscreen) {
-                        reader = new PDFReader({
-                            numWorkers: 5,
-                            file: files[i],
-                            success(pages) {
-                                document.getElementsByClassName("canvas")[0].style.display = null;
-                                document.getElementsByClassName("fileInput")[0].style.display = "none";
-                                viewer.setPage(1);
-
-                                document.getElementsByClassName("numPages")[0].innerText = pages;
-                            },error(e) {
-                                console.error(e);
-                                reader = undefined;
-                            }
-                        });
-                    }
-                }catch(e) {
-                    console.error(e);
-                }finally {
-                    if(!reader) {
-                        doc = await pdfjsLib.getDocument(await fileReaderAsync(files[i])).promise;
-                        document.getElementsByClassName("canvas")[0].style.display = null;
-                        document.getElementsByClassName("fileInput")[0].style.display = "none";
-                        viewer.setPage(1);
-
-                        document.getElementsByClassName("numPages")[0].innerText = viewer.numPages;
-                    }
-                }
-                break;
-            }
-        }
-    };
-
-    window.ondragover = () => {
-        event.stopPropagation();
-        event.preventDefault();
-    };
-
-    window.ondrop = async e => {
-        event.stopPropagation();
-        event.preventDefault();
-        if(doc != null) return;
-        getDocument(e.target.files || e.dataTransfer.files);
     };
 
     document.getElementsByClassName("fileInput")[0].onchange = e => {
@@ -656,13 +704,6 @@ const PageViewer = () => {
         
         beforeViewportPageLeft = document.getElementsByClassName("containerViewer")[0].scrollLeft;
     }
-
-    const sizeFitValue = () => {
-        const text = document.getElementsByClassName("currentPageWidth")[0];
-        const input = document.getElementsByClassName("currentPage")[0];
-        text.innerText = input.value;
-        input.style.width = `${text.offsetWidth}px`;
-    }
     
     var viewer = new class {
         get currentPage() {
@@ -707,8 +748,16 @@ const PageViewer = () => {
                 document.getElementsByClassName("pageContainer")[0].appendChild(target);
             }else {
                 target.setAttribute("pageInfo", page);
-                while(target.getElementsByTagName("canvas").length > 0) target.getElementsByTagName("canvas")[0].remove();
-                while(target.getElementsByTagName("img").length > 0) target.getElementsByTagName("img")[0].remove();
+                const canvasList = target.getElementsByTagName("canvas");
+                const imageList = target.getElementsByTagName("img");
+                while(canvasList.length > 0) {
+                    canvasList[0].cancel = true;
+                    canvasList[0].remove();
+                }
+                while(imageList.length > 0) {
+                    imageList[0].cancel = true;
+                    imageList[0].remove();
+                }
                 target.getElementsByClassName("imageCanvas")[0].appendChild(getPDFPageCanvas(page));
             }
 
@@ -718,6 +767,8 @@ const PageViewer = () => {
             document.getElementsByClassName("pageContainer")[0].style.width = null;
             document.getElementsByClassName("pageContainer")[0].style.height = null;
 
+            delete prevWorker.prevLoadingComplete[nowPage - 1];
+            delete prevWorker.prevLoading[nowPage - 1];
             cleanAndPrevLoad(page);
         }
 

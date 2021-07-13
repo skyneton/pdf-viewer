@@ -160,10 +160,9 @@
 
 .footerBottom {
     position: absolute;
-    top: 36px;
-    height: 20px;
+    top: 22px;
+    height: 48px;
     width: 100%;
-    padding: 6px 8px;
     box-sizing: border-box;
 }
 
@@ -226,6 +225,12 @@
 .pageInfo .currentPage::-webkit-outer-spin-button, .pageInfo .currentPage::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
+}
+
+.scroller {
+    padding: 20px 8px;
+    height: 100%;
+    box-sizing: border-box;
 }
 
 .scrollBar {
