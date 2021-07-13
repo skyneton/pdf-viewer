@@ -15,7 +15,11 @@ const PageViewer = () => {
 
     let reader;
 
-    const loadingList = [];
+    const prevWorker = {
+        prevLoadingComplete: [],
+        prevLoading: [],
+    };
+
 
     const offset = {
         x: 0,
@@ -30,18 +34,9 @@ const PageViewer = () => {
         beforeY: -1,
     };
 
-    const cleanPageViewers = () => {
-        const pageViewers = [...document.getElementsByClassName("pageViewer")];
-        for(let i = 0; i < pageViewers.length; i++) {
-            if(pageViewers[i].offsetWidth === 0 || pageViewers[i].getElementsByTagName("img").length <= 0 && pageViewers[i].getElementsByTagName("canvas").length <= 0 || !pageViewers[i].hasAttribute("hide") && pageViewers[i].hasAttribute("pageInfo") && pageViewers[i].getAttribute("pageInfo") != nowPage)
-                pageViewers[i].remove();
-        }
-    };
-
     const getPDFPageCanvas = i => {
-        if(loadingList[i - 1]) {
-            return loadingList[i - 1];
-        }
+        if(prevWorker.prevLoadingComplete[i - 1]) return prevWorker.prevLoadingComplete[i - 1];
+        if(prevWorker.prevLoading[i - 1]) return prevWorker.prevLoading[i - 1];
 
         const canvas = document.createElement("canvas");
         canvas.setAttribute("loading", true);
@@ -49,7 +44,10 @@ const PageViewer = () => {
         if(reader != null) {
             const success = () => {
                 canvas.removeAttribute("loading");
-                delete loadingList[i - 1];
+                if(prevWorker.prevLoading[i - 1]) {
+                    prevWorker.prevLoadingComplete[i - 1] = prevWorker.prevLoading[i - 1];
+                    delete prevWorker.prevLoading[i - 1];
+                }
             };
 
             // window.a = offscreen;
@@ -69,7 +67,7 @@ const PageViewer = () => {
 
             reader.drawPageCanvas(post);
 
-            loadingList[i - 1] = canvas;
+            prevWorker.prevLoading[i - 1] = canvas;
             return canvas;
         }
 
@@ -87,16 +85,52 @@ const PageViewer = () => {
             });
 
             canvas.removeAttribute("loading");
-            delete loadingList[i - 1];
+            if(prevWorker.prevLoading[i - 1]) {
+                prevWorker.prevLoadingComplete[i - 1] = prevWorker.prevLoading[i - 1];
+                delete prevWorker.prevLoading[i - 1];
+            }
         });
 
-        loadingList[i - 1] = canvas;
+        prevWorker.prevLoading[i - 1] = canvas;
         return canvas;
     };
+    
+    const cleanPageViewers = () => {
+        const pageViewers = [...document.getElementsByClassName("pageViewer")];
+        for(let i = 0; i < pageViewers.length; i++) {
+            if(pageViewers[i].offsetWidth === 0 || pageViewers[i].getElementsByTagName("img").length <= 0 && pageViewers[i].getElementsByTagName("canvas").length <= 0 || !pageViewers[i].hasAttribute("hide") && pageViewers[i].hasAttribute("pageInfo") && pageViewers[i].getAttribute("pageInfo") != nowPage)
+                pageViewers[i].remove();
+        }
+    };
 
-    const setPageInfo = () => {
-        document.getElementsByClassName("currentPage")[0].value = nowPage;
+    const cleanAndPrevLoad = page => {
+        const prevLoading = prevWorker.prevLoading;
+        const prevLoadingKeys = Object.keys(prevLoading);
+
+        const prevLoadingComplete = prevWorker.prevLoadingComplete;
+        const prevLoadingCompleteKeys = Object.keys(prevLoadingComplete);
+
+        for(let i = 0, len = prevLoadingKeys.length; i < len; i++) {
+            const key = prevLoadingKeys[i];
+            if(Math.abs(key - page) > 5) delete(prevLoading[key]);
+        }
+
+        for(let i = 0, len = prevLoadingCompleteKeys.length; i < len; i++) {
+            const key = prevLoadingCompleteKeys[i];
+            if(Math.abs(key - page) > 5) delete(prevLoadingComplete[key]);
+        }
+
+        if(page - 1 >= 1) getPDFPageCanvas(page - 1);
+        if(page + 1 <= viewer.numPages) getPDFPageCanvas(page + 1);
+        if(page + 2 <= viewer.numPages) getPDFPageCanvas(page + 2);
+    };
+
+    const setPageInfo = (page = nowPage) => {
+        document.getElementsByClassName("currentPage")[0].value = page;
         sizeFitValue();
+
+        const percent = clamp(page / viewer.numPages, 0, 1);
+        document.getElementsByClassName("scrollBarItem")[0].style.width = `${percent * 100}%`;
     }
 
     const getPDFPageView = i => {
@@ -139,6 +173,22 @@ const PageViewer = () => {
         if(v < min) v = min;
         if(v > max) v = max;
         return v;
+    }
+
+    const scrollChange = clientX => {
+        const percent = clamp((clientX - 8) / document.getElementsByClassName("scrollBar")[0].offsetWidth, 0, 1);
+        setPageInfo(Math.round(viewer.numPages * percent));
+    }
+
+    const endScrollMove = () => {
+        const scrollBar = document.getElementsByClassName("scrollBar")[0];
+        const percent = clamp(scrollBar.getElementsByClassName("scrollBarItem")[0].offsetWidth / scrollBar.offsetWidth, 0, 1);
+        scrollBar.touched = false;
+
+        const page = Math.round(viewer.numPages * percent);
+        setPageInfo(page);
+        viewer.setPage(page);
+        showMenu();
     }
 
     const onDirectionChanged = async nowDirection => {
@@ -257,6 +307,8 @@ const PageViewer = () => {
 
         nowPage += direction = nowDirection;
         setPageInfo();
+        
+        cleanAndPrevLoad(nowPage);
     };
 
     window.onkeydown = e => {
@@ -289,8 +341,20 @@ const PageViewer = () => {
         clicked.startClickTime = Date.now();
     };
 
+    window.onmousemove = e => {
+        if(document.getElementsByClassName("scrollBar")[0].touched) {
+            scrollChange(e.clientX);
+        }
+    }
+
     window.onmouseup = e => {
         if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
+        
+        if(document.getElementsByClassName("scrollBar")[0].touched) {
+            endScrollMove();
+            return;
+        }
+
         if(Date.now() - beforeScrolledTime < 20) return;
 
         const between = e.clientX - clicked.x;
@@ -316,6 +380,10 @@ const PageViewer = () => {
     };
 
     window.ontouchstart = e => {
+        if(document.getElementsByClassName("scrollBar")[0].touched && e.touches.length > 1) {
+            endScrollMove();
+        }
+
         clicked.x = e.touches[0].screenX;
         clicked.y = e.touches[0].screenY;
         clicked.startClickTime = Date.now();
@@ -333,6 +401,10 @@ const PageViewer = () => {
 
     window.ontouchmove = e => {
         const target = document.getElementsByClassName("containerViewer")[0];
+
+        if(document.getElementsByClassName("scrollBar")[0].touched) {
+            scrollChange(e.touches[0].clientX);
+        }
 
         if(e.touches.length != 2) {
             offset.x = target.scrollLeft;
@@ -391,6 +463,15 @@ const PageViewer = () => {
         if(e.touches.length == 2) {
             touchMoveData.beforeDistance = -1;
         }
+
+        if(document.getElementsByClassName("scrollBar")[0].touched) {
+            endScrollMove();
+        
+            if(!dragPageMove) {
+                if(e.touches.length == 0) dragPageMove = true;
+            }
+            return;
+        }
         
         if(!dragPageMove) {
             if(e.touches.length == 0) dragPageMove = true;
@@ -437,6 +518,24 @@ const PageViewer = () => {
         viewer.toggleFullScreen();
     };
 
+    document.getElementsByClassName("scrollBar")[0].onmousedown = e => {
+        clearInterval(showTimeout);
+        document.getElementsByClassName("menu")[0].setAttribute("show", true);
+        scrollChange(e.clientX);
+
+        document.getElementsByClassName("scrollBar")[0].touched = true;
+    };
+
+    document.getElementsByClassName("scrollBar")[0].ontouchstart = e => {
+        if(e.touches.length > 1) return;
+
+        clearInterval(showTimeout);
+        document.getElementsByClassName("menu")[0].setAttribute("show", true);
+        scrollChange(e.clientX);
+        
+        document.getElementsByClassName("scrollBar")[0].touched = true;
+    }
+
     window.oncontextmenu = e => {
         e.preventDefault();
     }
@@ -455,7 +554,8 @@ const PageViewer = () => {
     const getDocument = async files => {
         for(let i = 0; i < files.length; i++) {
             if(files[i].type === "application/pdf") {
-                while(loadingList.length > 0) loadingList.pop();
+                prevWorker.prevLoading = [];
+                prevWorker.prevLoadingComplete = [];
 
                 try {
                     if(HTMLCanvasElement.prototype.transferControlToOffscreen) {
@@ -579,11 +679,15 @@ const PageViewer = () => {
             return touchMoveData.nowZoomScale;
         }
 
-        get loadingList() {
-            return loadingList;
+        get prevLoading() {
+            return prevWorker.prevLoading;
         }
 
-        async setPage(page) {
+        get prevLoadingComplete() {
+            return prevWorker.prevLoadingComplete;
+        }
+
+        setPage(page) {
             if(page == null) return;
             if(reader == null && doc == null) return;
             const numPages = this.numPages;
@@ -613,6 +717,8 @@ const PageViewer = () => {
 
             document.getElementsByClassName("pageContainer")[0].style.width = null;
             document.getElementsByClassName("pageContainer")[0].style.height = null;
+
+            cleanAndPrevLoad(page);
         }
 
         showMenu() {
