@@ -243,7 +243,7 @@ const PageViewer = () => {
                             file: files[i],
                             success(pages) {
                                 document.getElementsByClassName("canvas")[0].style.display = null;
-                                document.getElementsByClassName("fileInput")[0].style.display = "none";
+                                document.getElementsByClassName("fileOpenBox")[0].style.display = "none";
                                 viewer.setPage(1);
 
                                 document.getElementsByClassName("numPages")[0].innerText = pages;
@@ -666,6 +666,10 @@ const PageViewer = () => {
         scrollChange(e.clientX);
         
         document.getElementsByClassName("scrollBar")[0].touched = true;
+    };
+
+    document.getElementsByClassName("fileOpenBoxContentBox")[0].onclick = () => {
+        document.getElementsByClassName("fileInput")[0].click();
     };
 
     document.getElementsByClassName("fileInput")[0].onchange = e => {

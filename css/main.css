@@ -31,6 +31,60 @@
     user-zoom: fixed;
 }
 
+.fileInput { display: none; }
+
+.fileOpenBox {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-content: center;
+    flex-wrap: wrap;
+}
+
+.fileOpenBoxFrame {
+    width: 210px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+.fileOpenBoxContent {
+    width: 100%;
+    padding-top: 100%;
+    position: relative;
+}
+.fileOpenBoxContentBox {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    height: 100%;
+    cursor: pointer;
+    border-radius: 50%;
+    background-color: rgb(234, 234, 234);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+    box-sizing: border-box;
+    box-shadow: 0 1px 4px black;
+}
+.fileOpenBoxContentBox > svg {
+    width: 40px;
+    height: 40px;
+    margin: 5px;
+}
+.fileOpenBoxContentBox > div {
+    text-align: center;
+}
+
 .canvas {
     display: flex;
     position: fixed;
