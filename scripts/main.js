@@ -229,6 +229,7 @@ const PageViewer = () => {
     const getDocument = async files => {
         for(let i = 0; i < files.length; i++) {
             if(files[i].type === "application/pdf") {
+                nowPage = -1;
                 prevWorker.prevLoading = [];
                 prevWorker.prevLoadingComplete = [];
                 prevWorker.loadingAmount = 0;
@@ -259,7 +260,7 @@ const PageViewer = () => {
                     if(!reader) {
                         doc = await pdfjsLib.getDocument(await fileReaderAsync(files[i])).promise;
                         document.getElementsByClassName("canvas")[0].style.display = null;
-                        document.getElementsByClassName("fileInput")[0].style.display = "none";
+                        document.getElementsByClassName("fileOpenBox")[0].style.display = "none";
                         viewer.setPage(1);
 
                         document.getElementsByClassName("numPages")[0].innerText = viewer.numPages;
@@ -755,6 +756,7 @@ const PageViewer = () => {
             const numPages = this.numPages;
             if(page > numPages) page = numPages;
             if(page < 1) page = 1;
+            if(page == nowPage) return;
 
             cleanPageViewers();
             if(timeout != null) clearTimeout(timeout);
