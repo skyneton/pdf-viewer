@@ -58,12 +58,9 @@ const PageViewer = () => {
                 canvas,
                 page: i,
                 scale: 96.0 / 72.0 * 2,
-                maxWidth: 32767,
-                maxHeight: 32767,
                 maxPixels: 268435456,
             };
             if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                post.maxWidth = post.maxHeight = 2048;
                 post.maxPixels = 3145728;
             }
 
@@ -74,7 +71,7 @@ const PageViewer = () => {
         }
 
         doc.getPage(i).then(async page => {
-            const viewport = page.getViewport({scale: 96.0 / 72.0 * 0.8});
+            const viewport = page.getViewport({scale: 96.0 / 72.0});
 
             canvas.width = viewport.width;
             canvas.height = viewport.height;
