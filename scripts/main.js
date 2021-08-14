@@ -153,7 +153,7 @@ const PageViewer = () => {
         document.getElementsByClassName("currentPage")[0].value = page;
         sizeFitValue();
 
-        const percent = clamp(page / viewer.numPages, 0, 1);
+        const percent = (viewer.numPages - 1) <= 0 ? 1 : clamp((page - 1) / (viewer.numPages - 1), 0, 1);
         document.getElementsByClassName("scrollBarItem")[0].style.width = `${percent * 100}%`;
     };
 
@@ -201,7 +201,7 @@ const PageViewer = () => {
 
     const scrollChange = clientX => {
         const percent = clamp((clientX - 8) / document.getElementsByClassName("scrollBar")[0].offsetWidth, 0, 1);
-        setPageInfo(Math.round(viewer.numPages * percent));
+        setPageInfo(Math.round((viewer.numPages - 1) * percent) + 1);
     }
 
     const endScrollMove = () => {
